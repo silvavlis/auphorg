@@ -1,16 +1,20 @@
 #!/usr/bin/python
 
 # create exiftool request string
-EXIFTOOL_TOOL = "/usr/bin/exiftool"
+EXIF_TOOL = "/usr/bin/exiftool"
 TAGS_TO_GET = [ 'FileName',
 				'Model',
 				'Software',
 				'DateTimeOriginal',
 				'CreateDate',
 				'ImageWidth',
-				'ImageHeight'
+				'ImageHeight',
+				'TagsList',
+				'HierarchicalSubject',
+				'Subject',
+				'Keywords'
 				]
-EXIFTOOL_REQUEST = EXIF_TOOL
+EXIFTOOL_REQUEST = EXIF_TOOL + ' -s'
 for tag in TAGS_TO_GET:
 	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
 # path to search the fotos for
@@ -28,25 +32,29 @@ class PhotoFile:
 	def _get_photo_info(self):
 		import subprocess
 
-		output = subprocess.Popen(EXIFTOOL_REQUEST + '"' + self.file_path + '"', shell=True, stdout=subprocess.PIPE).stdout
+		cmd = EXIFTOOL_REQUEST + ' "' + self.filepath + '"'
+		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		lines = output.read().splitlines()
 		for line in lines:
-			(tag_name, tag_value) = line.partition(':')
+			(tag_name, _, tag_value) = line.partition(':')
 			self.exif_tags[tag_name.strip()] = tag_value.strip()
 
 class PhotosCollection:
+	tags_to_ignore = ['Subject', 'TagsList', 'Keywords', 'HierarchicalSubject']
+
 	def __init__(self):
 		self._photos = []
 		for tag in TAGS_TO_GET:
 			setattr(self, tag, {})
 
-	def add_photo(self, photo):
+	def add(self, photo):
 		self._photos.append(photo)
 		for tag in TAGS_TO_GET:
-			if tag in dir(photo):
+			if (tag in photo.exif_tags.keys()) and (tag not in PhotosCollection.tags_to_ignore):
 				value_tag_photo = photo.exif_tags[tag]
 				tag_values = getattr(self,tag)
 				if value_tag_photo in tag_values.keys():
+					print 'Another photo has already ' + tag + ' = ' + value_tag_photo
 					tag_values[value_tag_photo].append(photo)
 				else:
 					tag_values[value_tag_photo] = [photo]
@@ -59,24 +67,29 @@ class PhotosCollection:
 				dups.append(tag_value)
 		return dups
 
-def is_photo(ext):
-	if (ext[1:].lower() in ('jpg', 'jpeg', 'raw')):
-		return True
-	else:
-		return False
+class TreeProcessor:
+	def __init__(self):
+		self.photos = PhotosCollection()
+		self._process_tree()
 
-def process_dir(arg, dir_path, filenames):
-	import os.path
+	def _is_photo(self, ext):
+		if (ext[1:].lower() in ('jpg', 'jpeg', 'raw')):
+			return True
+		else:
+			return False
 
-	for filename in filenames:
-		if (is_photo(os.path.splitext(filename)[1])):
-#			get_photo_date_exiftool(os.path.join(dir_path,filename))
-			get_photo_date_pil(os.path.join(dir_path,filename))
+	def _process_dir(self, arg, dir_path, filenames):
+		import os.path
 
-def process_tree():
-	import os.path
+		for filename in filenames:
+			if (self._is_photo(os.path.splitext(filename)[1])):
+				photo = PhotoFile(os.path.join(dir_path,filename))
+				self.photos.add(photo)
 
-	os.path.walk(PHOTOS_ROOT, process_dir, None)
+	def _process_tree(self):
+		import os.path
+
+		os.path.walk(PHOTOS_ROOT, self._process_dir, None)
 
 # OLD!!!
 
@@ -112,38 +125,13 @@ def get_photo_date_pil(file_path):
 		tags[decoded] = value
 	print tags["DateTimeOriginal"]
 
-def is_photo(ext):
-	if (ext[1:].lower() in ('jpg', 'jpeg', 'raw')):
-		return True
-	else:
-		return False
-
-def process_dir(arg, dir_path, filenames):
-	import os.path
-
-	for filename in filenames:
-		if (is_photo(os.path.splitext(filename)[1])):
-#			get_photo_date_exiftool(os.path.join(dir_path,filename))
-			get_photo_date_pil(os.path.join(dir_path,filename))
-
-def process_tree():
-	import os.path
-
-	os.path.walk(PHOTOS_ROOT, process_dir, None)
-
 def main():
 	import pickle
 
-#	process_tree()
-#	dup_photos_file = '/tmp/dup_photos.txt'
-#	fd = open(dup_photos_file, 'w')
-#	pickle.dump(date_dupl, fd)
-#	fd.close()
-	photos = PhotosCollection()
-	add_photos_to_collection(photos)
+	tree = TreeProcessor()
 	photos_file = '/tmp/photos.txt'
 	fd = open(photos_file, fd)
-	pickle.dump(photos,fd)
+	pickle.dump(tree.photos,fd)
 	fd.close()
 
 if (__name__ == '__main__'):
