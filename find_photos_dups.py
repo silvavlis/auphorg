@@ -18,7 +18,20 @@ EXIFTOOL_REQUEST = EXIF_TOOL + ' -s'
 for tag in TAGS_TO_GET:
 	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
 
-# CLASS photo_file
+class CameraItem:
+	def __init__(self, file_paths):
+		self.file_paths = file_paths
+		self.item_tags = ''
+		self.item_checksum = ''
+	def _get_item_info(self):
+		pass
+	def _get_item_checksum(self):
+		pass
+	def remove(self):
+		pass
+	def move(self):
+		pass
+
 class PhotoFile:
 	'stores the information of a photo file'
 
@@ -26,7 +39,6 @@ class PhotoFile:
 		self.filepath = filepath
 		self.exif_tags = self._get_photo_info()
 		self.image_checksum = self._get_image_checksum()
-#		print self.image_checksum
 
 	def _get_photo_info(self):
 		import subprocess
@@ -50,8 +62,6 @@ class PhotoFile:
 			checksum = cksm.digest()
 		except Exception, err:
 			print "Error gettig image from file %s: %s" % (self.filepath, str(err))
-#			import sys
-#			print "Error %d getting image from file %s (%s)" % (sys.exc_info()[0], self.filepath
 		return checksum
 
 class PhotosCollection:
@@ -70,15 +80,10 @@ class PhotosCollection:
 				value_tag_photo = photo.exif_tags[tag]
 				tag_values = getattr(self,tag)
 				if value_tag_photo in tag_values.keys():
-#					print photo.filepath + ': photos that have already ' + tag + ' = ' + value_tag_photo + ' =>'
-#					print tag_values[value_tag_photo]
 					tag_values[value_tag_photo].append(photo)
 				else:
 					tag_values[value_tag_photo] = [photo]
 		if photo.image_checksum in self.image_checksums.keys():
-#			print photo.filepath + ': photos with exactly the same image =>'
-#			for foto in self.image_checksums[photo.image_checksum]:
-#				print '\t' + foto.filepath
 			self.image_checksums[photo.image_checksum].append(photo)
 		else:
 			self.image_checksums[photo.image_checksum] = [photo]
@@ -98,7 +103,7 @@ class PhotosCollection:
 				print checksum
 				dups.append(checksum)
 
-class TreeAnalyzer:
+class TreeProcessor:
 	def __init__(self):
 		self.photos = PhotosCollection()
 		self.jpegs = []
@@ -118,33 +123,50 @@ class TreeAnalyzer:
 			return False
 
 	def _is_sidecar(self, filepath):
-		return False
+		import glob, os.path
+		same_name = glob.glob(os.path.splitext(filepath)[0] + '.*')
+		if len(same_name) > 1:
+			return True
+		else:
+			return False
 
 	def _process_dir(self, arg, dir_path, filenames):
 		import os.path
 
 		for filename in filenames:
-			if self._is_sidecar(os.path.join(dir_path,filename)):
-				print "%s is a sidecar file, it cannot be processed yet :-(" % os.path.join(dir_path,filename)
-			else:
+			filepath = os.path.join(dir_path, filename)
+			if not os.path.isdir(filepath):
 				if self._is_jpeg(os.path.splitext(filename)[1]):
-					photo = PhotoFile(os.path.join(dir_path,filename))
-					self.photos.add(photo)
-			if self._is_raw(os.path.splitext(filename)[1]):
-				print "%s is a RAW file, it cannot be processed yet :-(" % os.path.join(dir_path,filename)
+					if self._is_sidecar(filepath):
+						self.sidecars.append(filepath)
+					else:
+						self.jpegs.append(filepath)
+				if self._is_raw(os.path.splitext(filename)[1]):
+					self.raws.append(filepath)
 
-	def process_tree(self, photostree_root):
+	def scan_tree(self, photostree_root):
 		import os.path
-
 		os.path.walk(photostree_root, self._process_dir, None)
 
+	def process_tree(self):
+		n_jpeg_files = len(self.jpegs)
+		i = 0
+		for jpeg_file in self.jpegs:
+			photo = PhotoFile(jpeg_file)
+			self.photos.add(photo)
+			i = i + 1
+			if (i % (n_jpeg_files/10)) == 0:
+				print "%d%% already processed" % (i*100/ n_jpeg_files)
+
 def scan_tree(photos_file):
-	print "No photos information file found, scanning tree"
+	print "No valid photos information file found, scanning tree"
 	import pickle
 	photostree_root = '/home/silvavlis/Fotos'
 	fd = open(photos_file,'wb')
-	tree = TreeAnalyzer()
-	tree.process_tree(photostree_root)
+	tree = TreeProcessor()
+	tree.scan_tree(photostree_root)
+	print "Tree analyzed: %d jpegs found, %d raws found and %d sidecars found." % (len(tree.jpegs), len(tree.raws), len(tree.sidecars))
+	tree.process_tree()
 	print "Tree processed, dumping information"
 	pickle.dump(tree.photos,fd)
 	fd.close()
@@ -159,7 +181,7 @@ def analyze_tree(photos_file):
 if (__name__ == '__main__'):
 	import os.path
 	photos_file = '/home/silvavlis/program_org_fotos/photos_info.dat'
-	if not os.path.exists(photos_file):
-		scan_tree(photos_file)
-	else:
+	if (os.path.exists(photos_file)) and (os.path.getsize(photos_file) > 0):
 		analyze_tree(photos_file)
+	else:
+		scan_tree(photos_file)
