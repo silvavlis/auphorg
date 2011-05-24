@@ -51,15 +51,29 @@ class CameraItem:
 			return False
 
 	def _is_jpeg(self, ext):
-		'returns True is extension corresponds to JPEG, elsewhere False is returned'
-		if (ext.lower() in ('jpg', 'jpeg')):
+		'returns True is extension corresponds to image in JPEG format, elsewhere False is returned'
+		if (ext.lower() in ('jpg', 'jpeg', '.thm')):
 			return True
 		else:
 			return False
 
 	def _is_raw(self, ext):
-		'returns True is extension corresponds to RAW, elsewhere False is returned'
-		if (ext[1:].lower() in ('raw')):
+		'returns True is extension corresponds to image in RAW format, elsewhere False is returned'
+		if (ext[1:].lower() in ('.raw', '.tif', '.rw2')):
+			return True
+		else:
+			return False
+
+	def _is_video(self, ext):
+		'returns True is extension corresponds to video, elsewhere False is returned'
+		if (ext[1:].lower() in ('.mov', '.mpg', '.avi')):
+			return True
+		else:
+			return False
+
+	def _is_audio(self, ext):
+		'returns True is extension corresponds to audio, elsewhere False is returned'
+		if (ext[1:].lower() in ('.wav')):
 			return True
 		else:
 			return False
@@ -99,6 +113,14 @@ class CameraItem:
 			print "Error gettig image from file %s: %s" % (filepath, str(err))
 		return checksum
 
+	def _get_video_checksum(self, filepath):
+		raise RuntimeError, "checksum generation for file %s is not possible, "\
+			"not implemented yet" % filepath
+
+	def _get_audio_checksum(self, filepath):
+		raise RuntimeError, "checksum generation for file %s is not possible, "\
+			"not implemented yet" % filepath
+
 	def _get_checksum(self):
 		'calculates the checksum of the item content'
 		if self._is_jpeg(self.content):
@@ -112,9 +134,6 @@ class CameraItem:
 		import os.path
 		return os.path.splitext(file_path)[0]
 	
-	# properties
-	checksum = property(self._get_checksum)
-
 	# public methods
 	def add(self, file_path):
 		'adds a file to the item'
