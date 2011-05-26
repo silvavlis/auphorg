@@ -288,19 +288,17 @@ class ItemsCollection(dict):
 				dups.append(checksum)
 
 #
-class TreeScanner:
-	def __init__(self):
-		self.files_to_process = []
+class TreeScanner(list):
+	def __init__(self, photostree_root, *args):
+		list.__init__(self, args)
+		os.path.walk(photostree_root, self._scan_subtree, None)
 
 	def _scan_subtree(self, arg, dir_path, filenames):
 		for filename in filenames:
 			filepath = os.path.join(dir_path, filename)
 			if not (os.path.isdir(filepath) or os.path.islink(filepath)):
 				if not os.path.splitext(filepath)[1] in EXTENSIONS_TO_IGNORE:
-					self.files_to_process.append(filepath)
-
-	def scan_tree(self, photostree_root):
-		os.path.walk(photostree_root, self._scan_subtree, None)
+					self.append(filepath)
 
 class TreeProcessor:
 	def __init__(self, files_to_process):
@@ -327,17 +325,16 @@ def scan_tree(items_file):
 	if os.path.exists(files_list_file) and (os.path.getsize(files_list_file) > 0):
 		print "Valid files list file found, getting files from it"
 		fd_tree = open(files_list_file, 'rb')
-		tree= pickle.load(fd_tree)
+		media_files= pickle.load(fd_tree)
 		fd_tree.close()
 	else:
 		print "Valid files list file not found, generating it"
-		tree = TreeScanner()
-		tree.scan_tree(photostree_root)
+		media_files = TreeScanner(photostree_root)
 		fd_tree = open(files_list_file, 'wb')
-		pickle.dump(tree, fd_tree)
+		pickle.dump(media_files, fd_tree)
 		fd_tree.close()
-	print "Tree analyzed: %d files to be processed found." % len(tree.files_to_process)
-	items_tree = TreeProcessor(tree.files_to_process)
+	print "Tree analyzed: %d files to be processed found." % len(media_files)
+	items_tree = TreeProcessor(media_files)
 	items_tree.get_items()
 	print "%s items result from processing the tree" % len(items_tree.items.keys())
 	print "Tree processed, dumping information"
