@@ -256,13 +256,13 @@ class ItemsCollection:
 		for item_name in self.item.keys():
 			item = self.item[item_name]
 			for tag in TAGS_TO_GET:
-				if (tag in item.exif_tags.keys()) and (tag not in ItemsCollection.tags_to_ignore):
-					value_tag_photo = item.exif_tags[tag]
-					tag_values = getattr(self,tag)
-					if value_tag_photo in tag_values.keys():
-						tag_values[value_tag_photo].append(item)
+				item_tag_value = getattr(item, tag)
+				known_tag_values = getattr(self, tag)
+				if (item_tag_value != '') and (tag not in ItemsCollection.tags_to_ignore):
+					if item_tag_value in known_tag_values.keys():
+						known_tag_values[item_tag_value].append(item)
 					else:
-						tag_values[value_tag_photo] = [item]
+						known_tag_values[item_tag_value] = [item]
 			if item.content_checksum in self.content_checksum.keys():
 				self.content_checksum[item.content_checksum].append(item)
 			else:
@@ -307,7 +307,7 @@ class TreeProcessor:
 		self.files_to_process = files_to_process
 		self.items = None
 
-	def process_tree(self):
+	def get_items(self):
 		self.items = ItemsCollection()
 		n_files_to_process = len(self.files_to_process)
 		i = 0
@@ -316,7 +316,8 @@ class TreeProcessor:
 			i = i + 1
 			if (i % (n_files_to_process/10)) == 0:
 				print "%d%% already processed" % ((i*100/ n_files_to_process) + 1)
-		print "%s items result from processing the tree" % len(self.items.item.keys())
+
+	def classify_items(self):
 		self.items.generate_dicts()
 
 def scan_tree(items_file):
@@ -337,7 +338,8 @@ def scan_tree(items_file):
 		fd_tree.close()
 	print "Tree analyzed: %d files to be processed found." % len(tree.files_to_process)
 	items = TreeProcessor(tree.files_to_process)
-	items.process_tree()
+	items.get_items()
+	print "%s items result from processing the tree" % len(items.items.item.keys())
 	print "Tree processed, dumping information"
 	fd_items = open(items_file,'wb')
 	pickle.dump(items.items,fd_items)
