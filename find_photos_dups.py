@@ -223,13 +223,13 @@ class CameraItem:
 		raise RuntimeError, "method move not implemented yet in the class CameraItem"
 
 # collection of items
-class ItemsCollection:
+class ItemsCollection(dict):
 	'stores items in an organize way (getting them by tag value or checksum is possible)'
 	tags_to_ignore = ['Subject', 'TagsList', 'Keywords', 'HierarchicalSubject']
 
-	def __init__(self):
+	def __init__(self, *args):
 		'initializes the collection'
-		self.item = {}
+		dict.__init__(self, args)
 		for tag in TAGS_TO_GET:
 			setattr(self, tag, {})
 		self.content_checksum = {}
@@ -242,19 +242,19 @@ class ItemsCollection:
 		if item_name == '':
 			return
 		# if the item already exists, get the item
-		if item_name in self.item.keys():
-			item = self.item[item_name]
+		if item_name in self.keys():
+			item = self[item_name]
 		# if the item doesn't exist yet, create a new one and add it to the list
 		else:
 			item = CameraItem(item_name)
-			self.item[item_name] = item
+			self[item_name] = item
 		# add the file to the item
 		item.add(file_path)
 
 	def generate_dicts(self):
 		'generate the dictionaries containing items with the same tags or checksums'
-		for item_name in self.item.keys():
-			item = self.item[item_name]
+		for item_name in self.keys():
+			item = self[item_name]
 			for tag in TAGS_TO_GET:
 				item_tag_value = getattr(item, tag)
 				known_tag_values = getattr(self, tag)
@@ -337,12 +337,12 @@ def scan_tree(items_file):
 		pickle.dump(tree, fd_tree)
 		fd_tree.close()
 	print "Tree analyzed: %d files to be processed found." % len(tree.files_to_process)
-	items = TreeProcessor(tree.files_to_process)
-	items.get_items()
-	print "%s items result from processing the tree" % len(items.items.item.keys())
+	items_tree = TreeProcessor(tree.files_to_process)
+	items_tree.get_items()
+	print "%s items result from processing the tree" % len(items_tree.items.keys())
 	print "Tree processed, dumping information"
 	fd_items = open(items_file,'wb')
-	pickle.dump(items.items,fd_items)
+	pickle.dump(items_tree.items,fd_items)
 	fd_items.close()
 
 def analyze_tree(items_file):
