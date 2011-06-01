@@ -272,8 +272,36 @@ class ItemsCollection(dict):
 			i = i + 1
 			if (i % (n_files_to_process/10)) == 0:
 				trace("%d%% already processed" % ((i*100/ n_files_to_process) + 1))
+		# create connection to database for saving collection
+		db_path = os.path.join(os.getcwd, 'photos_db.dat')
+		self._photos_db = sqlite3.connect(db_path)
+		self._db_curs = self._photos_db.cursor()
+		if not os.path.exists(db_path):
+			self._db_curs().execute('create table items (name, content_file, tags_file)')
+			self._photos_db.commit()
 
 	def _add(self, file_path):
+		'adds item to the list'
+		# get the name of the item
+		item_name = CameraItem.path_to_name(file_path)
+		if item_name == '':
+			return
+		# if the item already exists, get the item
+		self._db_curs().execute('SELECT * FROM items WHERE name=?', (item_name,))
+		result = self._db_curs().fetchone()
+		if result == None:
+			item = CameraItem(item_name)
+			self._db_curs().execute('INSERT INTO items values (?,?,?)', (item_name, '', ''))
+		else:
+			content_file = result[1]
+			tags_file = result[2]
+			item = CameraItem(item_name, content_file, tags_file)
+		# add the file to the item
+		item.add(file_path)
+		# example for updating file 'content_file' of item
+		self._db_curs().execute('UPDATE items SET content_file=? WHERE name=?', (content_file, item_name))
+
+	def _add_old(self, file_path):
 		'adds item to the list'
 		# get the name of the item
 		item_name = CameraItem.path_to_name(file_path)
