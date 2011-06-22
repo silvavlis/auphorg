@@ -21,14 +21,14 @@ SCHEMA_TAGS = 'CREATE TABLE tags (' + \
 									'keywords TEXT);'
 SCHEMA_FILES = 'CREATE TABLE files (' + \
 									'file_id INTEGER PRIMARY KEY ASC, ' + \
-									'path TEXT, ' + \
+									'path TEXT UNIQUE, ' + \
 									'file_checksum TEXT, ' + \
 									'content_checksum TEXT, ' + \
 									'tags INTEGER, ' + \
 									'FOREIGN KEY(tags) REFERENCES tags(rowid));'
 SCHEMA_ITEMS = 'CREATE TABLE items (' + \
 									'item_id INTEGER PRIMARY KEY ASC, ' + \
-									'name TEXT, ' + \
+									'name TEXT UNIQUE, ' + \
 									'content_file INTEGER, ' + \
 									'tags_file INTEGER, ' + \
 									'FOREIGN KEY(content_file) REFERENCES files(rowid), ' + \
@@ -101,23 +101,34 @@ class DbConnector:
 		self._photos_db.commit()
 		return cur.lastrowid
 
-	def add_item(self, name, content_file, tags_file):
+	def add_item(self, name):
 		'adds a multimedia item to the DB'
+		cur = self._db_curs
+		self._db_curs.execute('INSERT INTO items (name) VALUES (?);', [name])
+		self._photos_db.commit()
+		return self._db_curs.lastrowid
+
+	def add_item_content(self, name, content_file):
+		'adds a content file to a multimedia item into the DB'
 		cur = self._db_curs
 		cur.execute('SELECT file_id FROM files WHERE path = "%s";' % content_file)
 		try:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (content_file, name)
-		if tags_file != "":
-			cur.execute('SELECT file_id FROM files WHERE path = "%s";' % tags_file)
-			try:
-				tags_file_id = cur.fetchone()[0]
-			except TypeError:
-				raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (tags_file, name)
-		self._db_curs.execute('INSERT INTO items (name, content_file, tags_file) ' + \
-								'VALUES (?, ?, ?);',
-								(name, content_file_id, tags_file_id))
+		self._db_curs.execute('UPDATE items SET content_file = ? WHERE name = ?;', (content_file_id, name))
+		self._photos_db.commit()
+		return self._db_curs.lastrowid
+
+	def add_item_tags(self, name, tags_file):
+		'adds a tags file to a multimedia item into the DB'
+		cur = self._db_curs
+		cur.execute('SELECT file_id FROM files WHERE path = "%s";' % tags_file)
+		try:
+			tags_file_id = cur.fetchone()[0]
+		except TypeError:
+			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (tags_file, name)
+		self._db_curs.execute('UPDATE items SET tags_file = ? WHERE name = ?;', (tags_file_id, name))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
 

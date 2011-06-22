@@ -130,12 +130,6 @@ class TestDbBackend(unittest.TestCase):
 		db.close()
 		os.remove(self._db_path)
 
-	def _add_sample_item(self):
-		test_item = self.test_item
-		self._add_poor_file()
-		self._add_rich_file()
-		self._db.add_item(test_item['name'], test_item['content_file'], test_item['tags_file'])
-
 	def _add_item(self):
 		test_item = self.test_item
 		self._db.add_item(test_item['name'])
@@ -143,7 +137,7 @@ class TestDbBackend(unittest.TestCase):
 	def test_add_item(self):
 		'test that the addition of items works properly'
 		# add the item
-		self._add_sample_item()
+		self._add_item()
 		# initialize the DB connection to check the addition
 		db = sqlite3.connect(self._db_path)
 		cur = db.cursor()
@@ -152,18 +146,6 @@ class TestDbBackend(unittest.TestCase):
 		values = cur.fetchall()
 		self.assertTrue(len(values) == 1)
 		self.assertTrue(values[0][0] == self.test_item['name'])
-		# check that content_file has been properly assigned
-		cur.execute("SELECT content_file FROM items;")
-		value = cur.fetchone()[0]
-		cur.execute("SELECT path FROM files WHERE file_id = %d;" % value)
-		value = cur.fetchone()[0]
-		self.assertTrue(value == self.test_item['content_file'])
-		# check that tags_file has been properly assigned
-		cur.execute("SELECT tags_file FROM items;")
-		value = cur.fetchone()[0]
-		cur.execute("SELECT path FROM files WHERE file_id = %d;" % value)
-		value = cur.fetchone()[0]
-		self.assertTrue(value == self.test_item['tags_file'])
 		# close DB connection and delete it
 		db.close()
 		os.remove(self._db_path)
@@ -171,13 +153,13 @@ class TestDbBackend(unittest.TestCase):
 	def _add_item_content(self):
 		test_item = self.test_item
 		self._add_poor_file()
-		self._add_rich_file()
-		self._db.add_item(test_item['name'], test_item['content_file'], test_item['tags_file'])
+		self._db.add_item(test_item['name'])
+		self._db.add_item_content(test_item['name'], test_item['content_file'])
 
 	def test_add_item_content(self):
 		'test that the addition of a content file to an item works properly'
 		# add the item
-		self._add_sample_item()
+		self._add_item_content()
 		# initialize the DB connection to check the addition
 		db = sqlite3.connect(self._db_path)
 		cur = db.cursor()
@@ -192,6 +174,28 @@ class TestDbBackend(unittest.TestCase):
 		cur.execute("SELECT path FROM files WHERE file_id = %d;" % value)
 		value = cur.fetchone()[0]
 		self.assertTrue(value == self.test_item['content_file'])
+		# close DB connection and delete it
+		db.close()
+		os.remove(self._db_path)
+
+	def _add_item_tags(self):
+		test_item = self.test_item
+		self._add_rich_file()
+		self._db.add_item(test_item['name'])
+		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
+
+	def test_add_item_tags(self):
+		'test that the addition of a tags file to an item works properly'
+		# add the item
+		self._add_item_tags()
+		# initialize the DB connection to check the addition
+		db = sqlite3.connect(self._db_path)
+		cur = db.cursor()
+		# check that the DB contains the expected item
+		cur.execute("SELECT name FROM items;")
+		values = cur.fetchall()
+		self.assertTrue(len(values) == 1)
+		self.assertTrue(values[0][0] == self.test_item['name'])
 		# check that tags_file has been properly assigned
 		cur.execute("SELECT tags_file FROM items;")
 		value = cur.fetchone()[0]
@@ -202,8 +206,24 @@ class TestDbBackend(unittest.TestCase):
 		db.close()
 		os.remove(self._db_path)
 
+	def _add_full_item(self):
+		test_item = self.test_item
+		self._add_rich_file()
+		self._add_poor_file()
+		self._db.add_item(test_item['name'])
+		self._db.add_item_content(test_item['name'], test_item['content_file'])
+		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
+
+	def test_get_item(self):
+		'test that getting an item works'
+		return
+		#add the item
+		self._add_full_item()
+		#get the item
+		item = self._db.get_item(test_item['name'])
+
 	def _add_extra_file(self):
-		self._add_sample_item()
+		self._add_item()
 		test_file = self.test_file_poor_2
 		test_item = self.test_item
 		self._db.add_poor_file(test_file['path'], test_file['file_checksum'], test_file['content_checksum'])
