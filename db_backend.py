@@ -64,6 +64,14 @@ class DbConnector:
 		'closes the connection to the DB before destroying the object'
 		self._photos_db.close()
 
+	def add_poor_file(self, path, file_checksum, image_checksum):
+		'adds a file without metadata to the DB'
+		cur = self._db_curs
+		cur.execute('INSERT INTO files (path, file_checksum, content_checksum) ' + \
+					'VALUES (?, ?, ?);', (path, file_checksum, image_checksum))
+		self._photos_db.commit()
+		return cur.lastrowid
+
 	def add_tags(self, model = '', software = '', date_time_original = '',
 						create_date = '', image_width = '', image_height = '',
 						tags_list = '',	hierarchical_subject = '',
@@ -80,8 +88,8 @@ class DbConnector:
 		self._photos_db.commit()
 		return cur.lastrowid
 
-	def add_jpeg_file(self, path, file_checksum, image_checksum, tags):
-		'adds a jpeg file to the DB'
+	def add_rich_file(self, path, file_checksum, image_checksum, tags):
+		'adds a file with metadata to the DB'
 		cur = self._db_curs
 		tags_index = self.add_tags(tags['model'], tags['software'], 
 										tags['date_time_original'], tags['create_date'], 
@@ -90,14 +98,6 @@ class DbConnector:
 										tags['subject'], tags['keywords'])
 		cur.execute('INSERT INTO files (path, file_checksum, content_checksum, tags) ' + \
 					'VALUES (?, ?, ?, ?);',	(path, file_checksum, image_checksum, tags_index))
-		self._photos_db.commit()
-		return cur.lastrowid
-
-	def add_other_file(self, path, file_checksum, image_checksum):
-		'adds a non-jpeg file to the DB'
-		cur = self._db_curs
-		cur.execute('INSERT INTO files (path, file_checksum, content_checksum) ' + \
-					'VALUES (?, ?, ?);', (path, file_checksum, image_checksum))
 		self._photos_db.commit()
 		return cur.lastrowid
 
@@ -117,9 +117,14 @@ class DbConnector:
 				raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (tags_file, name)
 		self._db_curs.execute('INSERT INTO items (name, content_file, tags_file) ' + \
 								'VALUES (?, ?, ?);',
-								(name, content_file, tags_file))
+								(name, content_file_id, tags_file_id))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
+
+	def get_item(self, item_name):
+		self._db_curs.execute('SELECT * FROM items WHERE name=?', (item_name,))
+		result = self._db_curs.fetchone()
+		return CameraItem(item_name, content_file = result[1], tags_file = result[2])
 
 	def add_extra_file(self, file_path, item_name):
 		'adds a relationship with an extra file to the DB'
@@ -134,15 +139,10 @@ class DbConnector:
 			item_id = cur.fetchone()[0]
 		except TypeError:
 			raise IndexError, "trying to a associate the file %s to the unknown item %s in an 'other file' relationship!" % (file_path, item_name)
-		cur.execute('INSERT INTO other_files (file_id, item_id) ' + \
+		cur.execute('INSERT INTO other_files (file, item) ' + \
 						'VALUES (?, ?);', (file_id, item_id))
 		self._photos_db.commit()
 		return cur.lastrowid
-
-	def get_item(self, item_name):
-		self._db_curs.execute('SELECT * FROM items WHERE name=?', (item_name,))
-		result = self._db_curs.fetchone()
-		return CameraItem(item_name, content_file = result[1], tags_file = result[2])
 
 	def _add(self, file_path):
 		'adds item to the list'
