@@ -1,5 +1,4 @@
-'''
-'''
+'handles the database where the multimedia items are stored'
 
 import os
 import sqlite3
@@ -24,22 +23,24 @@ SCHEMA_FILES = 'CREATE TABLE files (' + \
 									'path TEXT UNIQUE, ' + \
 									'file_checksum TEXT, ' + \
 									'content_checksum TEXT, ' + \
-									'tags INTEGER, ' + \
-									'FOREIGN KEY(tags) REFERENCES tags(rowid));'
-SCHEMA_ITEMS = 'CREATE TABLE items (' + \
+									'tags REFERENCES tags(tags_id));'
+SCHEMA_ITEMS = 'CREATE TABLE simple_items (' + \
 									'item_id INTEGER PRIMARY KEY ASC, ' + \
 									'name TEXT UNIQUE, ' + \
-									'content_file INTEGER, ' + \
-									'tags_file INTEGER, ' + \
-									'FOREIGN KEY(content_file) REFERENCES files(rowid), ' + \
-									'FOREIGN KEY(tags_file) REFERENCES files(rowid));'
+									'content_file REFERENCES files(file_id), ' + \
+									'tags_file REFERENCES files(file_id));'
 SCHEMA_OTHER_FILES = 'CREATE TABLE other_files(' + \
-									'file INTEGER PRIMARY KEY ASC, ' + \
-									'item INTEGER, ' + \
-									'FOREIGN KEY(file) REFERENCES files(rowid), ' + \
-									'FOREIGN KEY(item) REFERENCES items(rowid));'
+									'file REFERENCES files(file_id), ' + \
+									'item REFERENCES simple_items(item_id));'
 SCHEMA_FILE_INDEX = 'CREATE INDEX file_path ON files(path);'
-SCHEMA_ITEM_INDEX = 'CREATE INDEX item_name ON items(name);'
+SCHEMA_ITEM_INDEX = 'CREATE INDEX item_name ON simple_items(name);'
+SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
+									'SELECT i.name, cf.path, tf.path, group_concat(ef.path,"|") ' + \
+									'FROM simple_items i, files cf, files tf, files ef, other_files of ' + \
+									'WHERE i.content_file = cf.file_id AND ' + \
+									'i.tags_file = tf.file_id AND ' + \
+									'i.item_id = of.item AND ' + \
+									'of.file = ef.file_id;'
 
 class DbConnector:
 	def __init__(self, db_path=''):
@@ -52,13 +53,14 @@ class DbConnector:
 		# if database doesn't have the tables yet, create them
 		self._db_curs.execute("SELECT name FROM sqlite_master WHERE type='table';")
 		tables = self._db_curs.fetchall()
-		if (not (u'files',) in tables) or (not (u'items',) in tables) or (not (u'tags',) in tables):
+		if (not (u'files',) in tables) or (not (u'simple_items',) in tables) or (not (u'tags',) in tables):
 			self._db_curs.execute(SCHEMA_TAGS)
 			self._db_curs.execute(SCHEMA_FILES)
 			self._db_curs.execute(SCHEMA_ITEMS)
 			self._db_curs.execute(SCHEMA_OTHER_FILES)
 			self._db_curs.execute(SCHEMA_FILE_INDEX)
 			self._db_curs.execute(SCHEMA_ITEM_INDEX)
+			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
 			self._photos_db.commit()
 	def __del__(self):
 		'closes the connection to the DB before destroying the object'
@@ -104,7 +106,7 @@ class DbConnector:
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
 		cur = self._db_curs
-		self._db_curs.execute('INSERT INTO items (name) VALUES (?);', [name])
+		self._db_curs.execute('INSERT INTO simple_items (name) VALUES (?);', [name])
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
 
@@ -116,7 +118,7 @@ class DbConnector:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (content_file, name)
-		self._db_curs.execute('UPDATE items SET content_file = ? WHERE name = ?;', (content_file_id, name))
+		self._db_curs.execute('UPDATE simple_items SET content_file = ? WHERE name = ?;', (content_file_id, name))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
 
@@ -128,14 +130,16 @@ class DbConnector:
 			tags_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (tags_file, name)
-		self._db_curs.execute('UPDATE items SET tags_file = ? WHERE name = ?;', (tags_file_id, name))
+		self._db_curs.execute('UPDATE simple_items SET tags_file = ? WHERE name = ?;', (tags_file_id, name))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
 
 	def get_item(self, item_name):
-		self._db_curs.execute('SELECT * FROM items WHERE name=?', (item_name,))
-		result = self._db_curs.fetchone()
-		return CameraItem(item_name, content_file = result[1], tags_file = result[2])
+		'returns the specified item'
+		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
+		(item_name, content_file, tags_file, extra_files) = self._db_curs.fetchone()
+		extra_files = extra_files.split('|')
+		return (item_name, content_file, tags_file, extra_files)
 
 	def add_extra_file(self, file_path, item_name):
 		'adds a relationship with an extra file to the DB'
@@ -144,36 +148,15 @@ class DbConnector:
 		try:
 			file_id = cur.fetchone()[0]
 		except TypeError:
-			raise IndexError, "trying to a associate the unknown file %s to the item %s in an 'other file' relationship!" % (file_path, item_name)
-		cur.execute('SELECT item_id FROM items WHERE name = "%s";' % item_name)
+			raise IndexError, "trying to a associate the unknown file %s to the ' + \
+				'item %s in an 'other file' relationship!" % (file_path, item_name)
+		cur.execute('SELECT item_id FROM simple_items WHERE name = "%s";' % item_name)
 		try:
 			item_id = cur.fetchone()[0]
 		except TypeError:
-			raise IndexError, "trying to a associate the file %s to the unknown item %s in an 'other file' relationship!" % (file_path, item_name)
+			raise IndexError, "trying to a associate the file %s to the unknown ' + \
+				'item %s in an 'other file' relationship!" % (file_path, item_name)
 		cur.execute('INSERT INTO other_files (file, item) ' + \
 						'VALUES (?, ?);', (file_id, item_id))
 		self._photos_db.commit()
 		return cur.lastrowid
-
-	def _add(self, file_path):
-		'adds item to the list'
-		# get the name of the item
-		item_name = CameraItem.path_to_name(file_path)
-		if item_name == '':
-			trace_err('WARNING! trying to create an item with empty name?!')
-			return
-		# if the item already exists, get the item
-		item_attrs = self._get_item(item_name)
-		if item_attrs == None:
-			item = CameraItem(item_name)
-			self._db_curs.execute('INSERT INTO items VALUES (?,?,?)', (item_name, '', ''))
-			self._photos_db.commit()
-		else:
-			content_file = item_attrs[1]
-			tags_file = item_attrs[2]
-			item = CameraItem(item_name, content_file, tags_file)
-		# add the file to the item
-		item.add(file_path)
-		# example for updating file 'content_file' of item
-		self._db_curs.execute('UPDATE items SET content_file=? WHERE name=?', (content_file, item_name))
-		self._photos_db.commit()
