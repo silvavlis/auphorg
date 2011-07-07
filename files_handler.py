@@ -1,6 +1,6 @@
 import db_backend
 
-class FilesScanner:
+class FilesHandler:
 	def __init__(self):
 		self._db = db_backend.DbConnector()
 
