@@ -5,6 +5,7 @@ import sqlite3
 import os
 
 import db_backend
+import files_handler
 
 class TestDbBackend(unittest.TestCase):
 	test_tags = {'model': u'mod',
@@ -152,6 +153,39 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(tags_file == self.test_item['tags_file'])
 		self.assertTrue(extra_files == [self.test_file_poor_2['path'], self.test_file_poor_3['path']])
 
+class TestFilesHandler(unittest.TestCase):
+	_jpeg_file_path = "./test.jpg"
+
+	def setUp(self):
+		# instanciate a FileHandler object
+		self._fileshandler = files_handler.FilesHandler()	
+
+	def teardown(self):
+		# eliminate FileHandler object to close connection to DB and delete it
+		db_path = self._fileshandler._db._db_path
+		self._filehandler = None
+		os.remove(db_path)
+
+	def test_add_jpeg(self):
+		self._fileshandler.add_file(self._jpeg_file_path)
+		# initialize the DB connection to check the addition
+		db = sqlite3.connect(self._fileshandler._db._db_path)
+		cur = db.cursor()
+		# expected tag values are:
+		# FileName = "test.jpg"
+		# Model = "Canon DIGITAL IXUS 50"
+		# Software = "f-spot version 0.4.0"
+		# DateTimeOriginal = "2006:01:01 04:06:15"
+		# CreateDate = "2006:01:01 05:06:15"
+		# ImageWidth = "2592"
+		# ImageHeight = "1944"
+
+	def test_add_video(self):
+		pass
+
+	def test_add_audio(self):
+		pass
+
 #class TestItemsHandler(unittest.TestCase):
 #	def __init__(self):
 #		pass
@@ -165,41 +199,5 @@ class TestDbBackend(unittest.TestCase):
 #	def testGetItem(self):
 #		pass
 #
-#class TestFilesHandler(unittest.TestCase):
-#	def __init__(self):
-#		self._jpeg_file_path = "./test.jpg"
-#
-#	def setUp(self):
-#		# instanciate a FileHandler object
-#		#self._fileshandler = files_handler.FilesHandler()	
-#		pass
-#
-#	def teardown(self):
-#		# eliminate FileHandler object to close connection to DB and delete it
-#		#self._filehandler = None
-#		#os.remove(self._db_path)
-#		pass
-#
-#	def test_add_jpeg(self):
-##		self._fileshandler.add_file(self._jpeg_file_path)
-#		# initialize the DB connection to check the addition
-##		db = sqlite3.connect(self._db_path)
-##		cur = db.cursor()
-#		# expected tag values are:
-#		# FileName = "test.jpg"
-#		# Model = "Canon DIGITAL IXUS 50"
-#		# Software = "f-spot version 0.4.0"
-#		# DateTimeOriginal = "2006:01:01 04:06:15"
-#		# CreateDate = "2006:01:01 05:06:15"
-#		# ImageWidth = "2592"
-#		# ImageHeight = "1944"
-#		pass
-#
-#	def test_add_video(self):
-#		pass
-#
-#	def test_add_audio(self):
-#		pass
-
 if __name__ == '__main__':
 	unittest.main()
