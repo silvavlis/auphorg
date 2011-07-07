@@ -7,47 +7,53 @@ import os
 import db_backend
 
 class TestDbBackend(unittest.TestCase):
+	test_tags = {'model': u'mod',
+				'software': u'soft',
+				'date_time_original': u'dat_org',
+				'create_date': u'creat_dat',
+				'image_width': u'img_w',
+				'image_height': u'img_h',
+				'tags_list': u'tags',
+				'hierarchical_subject': u'hierc_subj',
+				'subject': u'subjs',
+				'keywords': u'keyws'
+				}
+	test_file_poor_1 = {'path': u'/this/is/a/path_1',
+						'file_checksum': u'f1l3ch3cksum1',
+						'content_checksum': u'c0nt3ntch3cksum1'
+						}
+	test_file_rich_1 = {'path': u'/this/is/a/path_2',
+						'file_checksum': u'f1l3ch3cksum2',
+						'content_checksum': u'c0nt3ntch3cksum2',
+						'tags': test_tags
+						}
+	test_file_poor_2 = {'path': u'/this/is/a/path_3',
+						'file_checksum': u'f1l3ch3cksum3',
+						'content_checksum': u'c0nt3ntch3cksum3'
+						}
+	test_file_poor_3 = {'path': u'/this/is/a/path_4',
+						'file_checksum': u'f1l3ch3cksum4',
+						'content_checksum': u'c0nt3ntch3cksum4'
+						}
+	test_item = {'name': u'/this/is/a/name', 
+						'content_file': test_file_poor_1['path'],
+						'tags_file': test_file_rich_1['path']
+						}
+	test_extra_file_1 = {'file': test_file_poor_2['path'],
+						'item': test_item['name']
+						}
+	test_extra_file_2 = {'file': test_file_poor_3['path'],
+						'item': test_item['name']
+						}
+
 	def setUp(self):
+		# create DB connection and get DB path
 		self._db = db_backend.DbConnector()	
 		self._db_path = self._db._db_path
-		self.test_tags = {'model': u'mod',
-					'software': u'soft',
-					'date_time_original': u'dat_org',
-					'create_date': u'creat_dat',
-					'image_width': u'img_w',
-					'image_height': u'img_h',
-					'tags_list': u'tags',
-					'hierarchical_subject': u'hierc_subj',
-					'subject': u'subjs',
-					'keywords': u'keyws'
-					}
-		self.test_file_poor_1 = {'path': u'/this/is/a/path_1',
-							'file_checksum': u'f1l3ch3cksum1',
-							'content_checksum': u'c0nt3ntch3cksum1'
-							}
-		self.test_file_rich_1 = {'path': u'/this/is/a/path_2',
-							'file_checksum': u'f1l3ch3cksum2',
-							'content_checksum': u'c0nt3ntch3cksum2',
-							'tags': self.test_tags
-							}
-		self.test_file_poor_2 = {'path': u'/this/is/a/path_3',
-							'file_checksum': u'f1l3ch3cksum3',
-							'content_checksum': u'c0nt3ntch3cksum3'
-							}
-		self.test_file_poor_3 = {'path': u'/this/is/a/path_4',
-							'file_checksum': u'f1l3ch3cksum4',
-							'content_checksum': u'c0nt3ntch3cksum4'
-							}
-		self.test_item = {'name': u'/this/is/a/name', 
-							'content_file': self.test_file_poor_1['path'],
-							'tags_file': self.test_file_rich_1['path']
-							}
-		self.test_extra_file_1 = {'file': self.test_file_poor_2['path'],
-							'item': self.test_item['name']
-							}
-		self.test_extra_file_2 = {'file': self.test_file_poor_3['path'],
-							'item': self.test_item['name']
-							}
+
+	def tearDown(self):
+		# delete DB
+		os.remove(self._db_path)
 
 	def test_db_creation(self):
 		'test that the DB exists and has the expected tables'
@@ -64,13 +70,11 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue((u'tags',) in tables)
 		self.assertTrue((u'files',) in tables)
 		self.assertTrue((u'other_files',) in tables)
-		# close DB connection and delete it
+		# close DB connection
 		db.close()
-		os.remove(self._db_path)
 
 	def test_add(self):
 		'test that the addition of files, items and extra files works properly'
-		return
 		# initialize the DB connection to check the addition
 		db = sqlite3.connect(self._db_path)
 		cur = db.cursor()
@@ -87,12 +91,13 @@ class TestDbBackend(unittest.TestCase):
 			test_file['tags'])
 		for tag_name in test_file.keys():
 			if tag_name != 'tags':
-				cur.execute("SELECT " + tag_name + " FROM files;")
+				cur.execute("SELECT " + tag_name + " FROM files WHERE path = '" + test_file['path'] + "';")
 				tag = cur.fetchone()
 				self.assertTrue(tag == (test_file[tag_name],))
 			else:
 				for tag_name in self.test_tags.keys():
-					cur.execute("SELECT " + tag_name + " FROM tags LEFT JOIN files;")
+					cur.execute("SELECT " + tag_name + " FROM tags LEFT JOIN files WHERE path = '" + \
+						test_file['path'] + "';")
 					tag = cur.fetchone()
 					self.assertTrue(tag == (self.test_tags[tag_name],))
 		# test the addition of an item
@@ -120,9 +125,8 @@ class TestDbBackend(unittest.TestCase):
 		test_file = self.test_file_poor_2
 		self._db.add_poor_file(test_file['path'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
-		# close DB connection and delete it
+		# close DB connection
 		db.close()
-		os.remove(self._db_path)
 
 	def test_get_item(self):
 		'test that getting an item works'
@@ -147,6 +151,55 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(content_file == self.test_item['content_file'])
 		self.assertTrue(tags_file == self.test_item['tags_file'])
 		self.assertTrue(extra_files == [self.test_file_poor_2['path'], self.test_file_poor_3['path']])
+
+#class TestItemsHandler(unittest.TestCase):
+#	def __init__(self):
+#		pass
+#
+#	def setUp(self):
+#		pass
+#
+#	def tearDown(self):
+#		pass
+#
+#	def testGetItem(self):
+#		pass
+#
+#class TestFilesHandler(unittest.TestCase):
+#	def __init__(self):
+#		self._jpeg_file_path = "./test.jpg"
+#
+#	def setUp(self):
+#		# instanciate a FileHandler object
+#		#self._fileshandler = files_handler.FilesHandler()	
+#		pass
+#
+#	def teardown(self):
+#		# eliminate FileHandler object to close connection to DB and delete it
+#		#self._filehandler = None
+#		#os.remove(self._db_path)
+#		pass
+#
+#	def test_add_jpeg(self):
+##		self._fileshandler.add_file(self._jpeg_file_path)
+#		# initialize the DB connection to check the addition
+##		db = sqlite3.connect(self._db_path)
+##		cur = db.cursor()
+#		# expected tag values are:
+#		# FileName = "test.jpg"
+#		# Model = "Canon DIGITAL IXUS 50"
+#		# Software = "f-spot version 0.4.0"
+#		# DateTimeOriginal = "2006:01:01 04:06:15"
+#		# CreateDate = "2006:01:01 05:06:15"
+#		# ImageWidth = "2592"
+#		# ImageHeight = "1944"
+#		pass
+#
+#	def test_add_video(self):
+#		pass
+#
+#	def test_add_audio(self):
+#		pass
 
 if __name__ == '__main__':
 	unittest.main()
