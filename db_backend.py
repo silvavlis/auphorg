@@ -8,16 +8,16 @@ DB_PATH_TEST = os.path.join('/tmp/test_auphorg.db')
 #DB schema
 SCHEMA_TAGS = 'CREATE TABLE tags (' + \
 									'tags_id INTEGER PRIMARY KEY ASC, ' + \
-									'model TEXT, ' + \
-									'software TEXT, ' + \
-									'date_time_original TEXT, ' + \
-									'create_date TEXT, ' + \
-									'image_width TEXT, ' + \
-									'image_height TEXT, ' + \
-									'tags_list TEXT, ' + \
-									'hierarchical_subject TEXT, ' + \
-									'subject TEXT, ' + \
-									'keywords TEXT);'
+									'Model TEXT, ' + \
+									'Software TEXT, ' + \
+									'DateTimeOriginal TEXT, ' + \
+									'CreateDate TEXT, ' + \
+									'ImageWidth TEXT, ' + \
+									'ImageHeight TEXT, ' + \
+									'TagsList TEXT, ' + \
+									'HierarchicalSubject TEXT, ' + \
+									'Subject TEXT, ' + \
+									'Keywords TEXT);'
 SCHEMA_FILES = 'CREATE TABLE files (' + \
 									'file_id INTEGER PRIMARY KEY ASC, ' + \
 									'path TEXT UNIQUE, ' + \
@@ -66,11 +66,19 @@ class DbConnector:
 		'closes the connection to the DB before destroying the object'
 		self._photos_db.close()
 
-	def add_poor_file(self, path, file_checksum, image_checksum):
+	def add_non_raw_file(self, path, file_checksum, content_checksum):
 		'adds a file without metadata to the DB'
 		cur = self._db_curs
 		cur.execute('INSERT INTO files (path, file_checksum, content_checksum) ' + \
-					'VALUES (?, ?, ?);', (path, file_checksum, image_checksum))
+					'VALUES (?, ?, ?);', (path, file_checksum, content_checksum))
+		self._photos_db.commit()
+		return cur.lastrowid
+
+	def add_raw_file(self, path, file_checksum):
+		'adds a file without metadata to the DB'
+		cur = self._db_curs
+		cur.execute('INSERT INTO files (path, file_checksum) ' + \
+					'VALUES (?, ?);', (path, file_checksum))
 		self._photos_db.commit()
 		return cur.lastrowid
 
@@ -80,9 +88,9 @@ class DbConnector:
 						subject = '', keywords = ''):
 		'adds a tags item to the DB'
 		cur = self._db_curs
-		cur.execute('INSERT INTO tags (model, software, date_time_original, ' + \
-					'create_date, image_width, image_height, tags_list, ' + \
-					'hierarchical_subject, subject, keywords) ' + \
+		cur.execute('INSERT INTO tags (Model, Software, DateTimeOriginal, ' + \
+					'CreateDate, ImageWidth, ImageHeight, TagsList, ' + \
+					'HierarchicalSubject, Subject, Keywords) ' + \
 					'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', 
 					(model, software, date_time_original, create_date, 
 					image_width, image_height, tags_list, 
@@ -93,15 +101,31 @@ class DbConnector:
 	def add_rich_file(self, path, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
 		cur = self._db_curs
-		tags_index = self.add_tags(tags['model'], tags['software'], 
-										tags['date_time_original'], tags['create_date'], 
-										tags['image_width'], tags['image_height'], 
-										tags['tags_list'], tags['hierarchical_subject'], 
-										tags['subject'], tags['keywords'])
+		tags_index = self.add_tags(tags['Model'], tags['Software'], 
+										tags['DateTimeOriginal'], tags['CreateDate'], 
+										tags['ImageWidth'], tags['ImageHeight'], 
+										tags['TagsList'], tags['HierarchicalSubject'], 
+										tags['Subject'], tags['Keywords'])
 		cur.execute('INSERT INTO files (path, file_checksum, content_checksum, tags) ' + \
 					'VALUES (?, ?, ?, ?);',	(path, file_checksum, image_checksum, tags_index))
 		self._photos_db.commit()
 		return cur.lastrowid
+
+	def get_rich_file_tags(self, path):
+		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
+		tags_list = self._db_curs.fetchone()
+		tags = {}
+		tags['Model'] = tags_list[1]
+		tags['Software'] = tags_list[2]
+		tags['DateTimeOriginal'] = tags_list[3]
+		tags['CreateDate'] = tags_list[4]
+		tags['ImageWidth'] = tags_list[5]
+		tags['ImageHeight'] = tags_list[6]
+		tags['TagsList'] = tags_list[7]
+		tags['HierarchicalSubject'] = tags_list[8]
+		tags['Subject'] = tags_list[9]
+		tags['Keywords'] = tags_list[10]
+		return tags
 
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
