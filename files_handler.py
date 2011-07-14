@@ -1,4 +1,5 @@
 import Image
+import wave
 import hashlib
 import os.path 
 import db_backend
@@ -92,6 +93,24 @@ class FilesHandler:
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_checksum, content_checksum)
 
+	def _wav_checksum(self, path):
+		'calculates the checksum of a wave file'
+		try:
+			wav = wave.open(path, 'rb')
+			cksm = hashlib.sha512()
+			cksm.update(wav.readframes(wav.getnframes()))
+			return cksm.hexdigest()
+		except Exception, err:
+			print "Error getting audio from wave file %s: %s" % (path, str(err))
+
+	def _add_audio(self, path):
+		'adds a video file to the DB'
+		# calculate the checksums of the file
+		file_checksum = self._file_checksum(path)
+		content_checksum = self._wav_checksum(path)
+		# add the file to the DB
+		self._db.add_non_raw_file(path, file_checksum, content_checksum)
+
 	def add_file(self, path):
 		'adds the file of the given path to the DB'
 		# test that path is file
@@ -108,3 +127,5 @@ class FilesHandler:
 			self._add_raw_image(path)
 		elif (extension in ('.tif')):
 			self._add_image(path)
+		elif (extension in ('.wav')):
+			self._add_audio(path)

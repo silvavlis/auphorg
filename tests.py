@@ -164,6 +164,7 @@ class TestFilesHandler(unittest.TestCase):
 	_tif_file_path = "./test.tif"
 	_raw_file_path = "./test.raw"
 	_video_file_path = "./test.avi"
+	_audio_file_path = "./test.wav"
 
 	def setUp(self):
 		# instanciate a FileHandler object
@@ -299,7 +300,25 @@ class TestFilesHandler(unittest.TestCase):
 		self.assertTrue(content_checksum == CONTENT_CHECKSUM)
 
 	def test_add_audio(self):
-		pass
+		'tests that the addition of an audio file works'
+		path = self._audio_file_path
+		# add the file
+		self._fileshandler.add_file(path)
+		# initialize the DB connection to check the addition
+		db = sqlite3.connect(self._fileshandler._db._db_path)
+		cur = db.cursor()
+		# test the file checksums
+		cur.execute("SELECT file_checksum, content_checksum FROM files ' + \
+					'WHERE path = ?;", [path])
+		(file_checksum, content_checksum)= cur.fetchone()
+		FILE_CHECKSUM = '720b5044c891d29212b4e8b0289d2b5dcec33a040208be7e3cbe' + \
+			'1c331a2a403a1041d94d13f68d9b0961f4721619a250e50628bf9ae26220ff72' + \
+			'05f10e5a871e'
+		self.assertTrue(file_checksum == FILE_CHECKSUM)
+		CONTENT_CHECKSUM = '9a0a83575d79c38052a07d50b809753fab5ca31680de2bfa2' + \
+			'67ead08548f15f82e4e7b2695874c1b7dc363427c7379636f7d6b3864a65d382' + \
+			'79a5c45b8250758'
+		self.assertTrue(content_checksum == CONTENT_CHECKSUM)
 
 #class TestItemsHandler(unittest.TestCase):
 #	def __init__(self):
