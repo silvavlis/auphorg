@@ -2,6 +2,8 @@
 
 import os
 import sqlite3
+import re
+import inspect
 
 DB_PATH_TEST = os.path.join('/tmp/test_auphorg.db')
 
@@ -27,8 +29,8 @@ SCHEMA_FILES = 'CREATE TABLE files (' + \
 SCHEMA_ITEMS = 'CREATE TABLE simple_items (' + \
 									'item_id INTEGER PRIMARY KEY ASC, ' + \
 									'name TEXT UNIQUE, ' + \
-									'content_file REFERENCES files(file_id), ' + \
-									'tags_file REFERENCES files(file_id));'
+									'content_file REFERENCES files(file_id) UNIQUE, ' + \
+									'tags_file REFERENCES files(file_id) UNIQUE);'
 SCHEMA_OTHER_FILES = 'CREATE TABLE other_files(' + \
 									'file REFERENCES files(file_id), ' + \
 									'item REFERENCES simple_items(item_id));'
@@ -45,6 +47,21 @@ SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
 									'i.item_id = of.item AND ' + \
 									'of.file = ef.file_id;'
 
+# exceptions
+class ApoDbError(ValueError):
+	pass
+
+class ApoDbValueError(ApoDbError):
+	def __init__(self, item_type, field, value):
+		self.item_type = item_type
+		self.field = field
+		self.value = value
+
+	def __str__(self):
+		return 'there is already a %s with %s = %s' % \
+			(self.item_type, self.field, self.value)
+
+#
 class DbConnector:
 	def __init__(self, db_path=''):
 		'connects to DB for saving collection'
@@ -65,25 +82,50 @@ class DbConnector:
 			self._db_curs.execute(SCHEMA_ITEM_INDEX)
 			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
 			self._photos_db.commit()
+
 	def __del__(self):
 		'closes the connection to the DB before destroying the object'
 		self._photos_db.close()
 
+	def _insert_element(self, table, values):	
+		'inserts the specified values in table, explicitly reporting duplications'
+		field_names = ''
+		field_placeholders = ''
+		field_values = []
+		for field in values.keys():
+			field_names += field + ', '
+			field_placeholders += '?, '
+			field_values.append(values[field])
+		field_names = field_names[:-2]
+		field_placeholders = field_placeholders[:-2]
+		try:
+			sql_insert = 'INSERT INTO %s (%s) VALUES (%s);' % \
+				(table, field_names, field_placeholders)
+			self._db_curs.execute(sql_insert, field_values)
+			self._photos_db.commit()
+		except sqlite3.IntegrityError, err:
+			dup_field = re.match(r'column (.*) is not unique', str(err))
+			if (dup_fieldm == None):
+				raise
+			else:
+				err_field = dup_field.group(1)
+				item_type = table[:-1]
+				raise AopDbValueError(item_type, err_field, values[err_field])
+
 	def add_non_raw_file(self, path, file_checksum, content_checksum):
 		'adds a file without metadata to the DB'
-		cur = self._db_curs
-		cur.execute('INSERT INTO files (path, file_checksum, content_checksum) ' + \
-					'VALUES (?, ?, ?);', (path, file_checksum, content_checksum))
-		self._photos_db.commit()
-		return cur.lastrowid
+		values = {}
+		values['path'] = path
+		values['file_checksum'] = file_checksum
+		values['content_checksum'] = content_checksum
+		self._insert_element('files', values)
 
 	def add_raw_file(self, path, file_checksum):
 		'adds a file without metadata to the DB'
-		cur = self._db_curs
-		cur.execute('INSERT INTO files (path, file_checksum) ' + \
-					'VALUES (?, ?);', (path, file_checksum))
-		self._photos_db.commit()
-		return cur.lastrowid
+		values = {}
+		values['path'] = path
+		values['file_checksum'] = file_checksum
+		self._insert_element('files', values)
 
 	def add_tags(self, model = '', software = '', date_time_original = '',
 						create_date = '', image_width = '', image_height = '',
@@ -103,16 +145,17 @@ class DbConnector:
 
 	def add_rich_file(self, path, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
-		cur = self._db_curs
 		tags_index = self.add_tags(tags['Model'], tags['Software'], 
 										tags['DateTimeOriginal'], tags['CreateDate'], 
 										tags['ImageWidth'], tags['ImageHeight'], 
 										tags['TagsList'], tags['HierarchicalSubject'], 
 										tags['Subject'], tags['Keywords'])
-		cur.execute('INSERT INTO files (path, file_checksum, content_checksum, tags) ' + \
-					'VALUES (?, ?, ?, ?);',	(path, file_checksum, image_checksum, tags_index))
-		self._photos_db.commit()
-		return cur.lastrowid
+		values = {}
+		values['path'] = path
+		values['file_checksum'] = file_checksum
+		values['content_checksum'] = image_checksum
+		values['tags'] = tags_index
+		self._insert_element('files', values)
 
 	def get_rich_file_tags(self, path):
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
@@ -132,10 +175,9 @@ class DbConnector:
 
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
-		cur = self._db_curs
-		self._db_curs.execute('INSERT INTO simple_items (name) VALUES (?);', [name])
-		self._photos_db.commit()
-		return self._db_curs.lastrowid
+		values = {}
+		values['name'] = name
+		self._insert_element('simple_items', values)
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
