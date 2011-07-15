@@ -41,8 +41,10 @@ class FilesHandler:
 		'adds a raw file to the DB'
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
+		# get the timestamp of the last modification
+		file_time = os.path.getmtime(path)
 		# add the file to the DB and to the item
-		self._db.add_raw_file(path, file_checksum)
+		self._db.add_raw_file(path, file_time, file_checksum)
 		self._db.add_item_content(item_name, path)
 
 	def _image_checksum(self, path):
@@ -68,16 +70,20 @@ class FilesHandler:
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
 		content_checksum = self._image_checksum(path)
+		# get the timestamp of the last modification
+		file_time = os.path.getmtime(path)
 		# add the file to the DB and to the item
-		self._db.add_rich_file(path, file_checksum, content_checksum, exif_tags)
+		self._db.add_rich_file(path, file_time, file_checksum, content_checksum, exif_tags)
 
 	def _add_image(self, item_name, path):
 		'adds a raw file to the DB'
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
 		content_checksum = self._image_checksum(path)
+		# get the timestamp of the last modification
+		file_time = os.path.getmtime(path)
 		# add the file to the DB
-		self._db.add_non_raw_file(path, file_checksum, content_checksum)
+		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
 
 	def _video_checksum(self, path):
 		'calculates the checksum of a video, using ffmpeg and md5sum'
@@ -91,8 +97,10 @@ class FilesHandler:
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
 		content_checksum = self._video_checksum(path)
+		# get the timestamp of the last modification
+		file_time = os.path.getmtime(path)
 		# add the file to the DB
-		self._db.add_non_raw_file(path, file_checksum, content_checksum)
+		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
 
 	def _wav_checksum(self, path):
 		'calculates the checksum of a wave file'
@@ -109,8 +117,10 @@ class FilesHandler:
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
 		content_checksum = self._wav_checksum(path)
+		# get the timestamp of the last modification
+		file_time = os.path.getmtime(path)
 		# add the file to the DB
-		self._db.add_non_raw_file(path, file_checksum, content_checksum)
+		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
 
 	def add_file(self, path):
 		'adds the file of the given path to the DB'
