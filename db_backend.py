@@ -35,7 +35,10 @@ SCHEMA_OTHER_FILES = 'CREATE TABLE other_files(' + \
 SCHEMA_FILE_INDEX = 'CREATE INDEX file_path ON files(path);'
 SCHEMA_ITEM_INDEX = 'CREATE INDEX item_name ON simple_items(name);'
 SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
-									'SELECT i.name, cf.path, tf.path, group_concat(ef.path,"|") ' + \
+									'SELECT i.name AS name, ' + \
+									'cf.path AS content_file, ' + \
+									'tf.path AS tags_file, ' + \
+									'group_concat(ef.path,"|") AS extra_files ' + \
 									'FROM simple_items i, files cf, files tf, files ef, other_files of ' + \
 									'WHERE i.content_file = cf.file_id AND ' + \
 									'i.tags_file = tf.file_id AND ' + \
@@ -142,6 +145,7 @@ class DbConnector:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (content_file, name)
+		cur.execute('SELECT content_file FROM items WHERE name = ?;', (name,))
 		self._db_curs.execute('UPDATE simple_items SET content_file = ? WHERE name = ?;', (content_file_id, name))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
@@ -161,7 +165,13 @@ class DbConnector:
 	def get_item(self, item_name):
 		'returns the specified item'
 		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
-		(item_name, content_file, tags_file, extra_files) = self._db_curs.fetchone()
+		try:
+			(item_name, content_file, tags_file, extra_files) = self._db_curs.fetchone()
+		except TypeError, err:
+			if (str(err) == "'NoneType' object is not iterable"):
+				return None
+			else:
+				raise
 		extra_files = extra_files.split('|')
 		return (item_name, content_file, tags_file, extra_files)
 

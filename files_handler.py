@@ -37,6 +37,14 @@ class FilesHandler:
 		lines = output.read().splitlines()
 		return lines[0].split(' ')[0]
 
+	def _add_raw_image(self, item_name, path):
+		'adds a raw file to the DB'
+		# calculate the checksums of the file
+		file_checksum = self._file_checksum(path)
+		# add the file to the DB and to the item
+		self._db.add_raw_file(path, file_checksum)
+		self._db.add_item_content(item_name, path)
+
 	def _image_checksum(self, path):
 		'calculates the SHA512 checksum of the contained image'
 		try:
@@ -47,7 +55,7 @@ class FilesHandler:
 		except Exception, err:
 			print "Error gettig image from file %s: %s" % (path, str(err))
 
-	def _add_jpeg(self, path):
+	def _add_jpeg(self, item_name, path):
 		'adds a JPEG file to the DB'
 		# get the tags of the file
 		exif_tags = {}
@@ -60,17 +68,10 @@ class FilesHandler:
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
 		content_checksum = self._image_checksum(path)
-		# add the file to the DB
+		# add the file to the DB and to the item
 		self._db.add_rich_file(path, file_checksum, content_checksum, exif_tags)
 
-	def _add_raw_image(self, path):
-		'adds a raw file to the DB'
-		# calculate the checksums of the file
-		file_checksum = self._file_checksum(path)
-		# add the file to the DB
-		self._db.add_raw_file(path, file_checksum)
-
-	def _add_image(self, path):
+	def _add_image(self, item_name, path):
 		'adds a raw file to the DB'
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
@@ -85,7 +86,7 @@ class FilesHandler:
 		result = output.read().splitlines()[0]
 		return result.split(' ')[0]
 
-	def _add_video(self, path):
+	def _add_video(self, item_name, path):
 		'adds a video file to the DB'
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
@@ -103,7 +104,7 @@ class FilesHandler:
 		except Exception, err:
 			print "Error getting audio from wave file %s: %s" % (path, str(err))
 
-	def _add_audio(self, path):
+	def _add_audio(self, item_name, path):
 		'adds a video file to the DB'
 		# calculate the checksums of the file
 		file_checksum = self._file_checksum(path)
@@ -117,15 +118,21 @@ class FilesHandler:
 		if not os.path.isfile(path):
 			raise RuntimeError, "path isn't a file!"
 		# get file extension to find out type of file
-		extension = os.path.splitext(path)[1].lower()
+		(item_name, extension) = os.path.splitext(path)
+		extension = extension.lower()
+		# check if the item already exists
+		item = self._db.get_item(item_name)
+		# if item doesn't exist, create a new item for the file
+		if (item == None):
+			self._db.add_item(item_name)
 		# if JPEG file
 		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
-			self._add_jpeg(path)
+			self._add_jpeg(item_name, path)
 		elif (extension in ('.avi', '.mov', '.wmv')):
-			self._add_video(path)
+			self._add_video(item_name, path)
 		elif (extension in ('.raw', '.rw2')):
-			self._add_raw_image(path)
+			self._add_raw_image(item_name, path)
 		elif (extension in ('.tif')):
-			self._add_image(path)
+			self._add_image(item_name, path)
 		elif (extension in ('.wav')):
-			self._add_audio(path)
+			self._add_audio(item_name, path)

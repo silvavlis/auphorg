@@ -4,6 +4,7 @@
 import unittest
 import sqlite3
 import os
+import shutil
 
 import db_backend
 import files_handler
@@ -319,6 +320,26 @@ class TestFilesHandler(unittest.TestCase):
 			'67ead08548f15f82e4e7b2695874c1b7dc363427c7379636f7d6b3864a65d382' + \
 			'79a5c45b8250758'
 		self.assertTrue(content_checksum == CONTENT_CHECKSUM)
+
+class TestTreeScanner(unittest.TestCase):
+	def setUp(self):
+		if os.path.exists('./testTree'):
+			shutil.rmtree('./testTree')
+		os.mkdir('./testTree')
+		os.mkdir('./testTree/subdir1')
+		shutil.copy('./test.jpg', './testTree/subdir1/test_1.jpg')
+		shutil.copy('./test.jpg', './testTree/subdir1/test_2.jpg')
+		shutil.copy('./test.avi', './testTree/subdir1/test_2.avi')
+		shutil.copy('./test.jpg', './testTree/subdir1/test_3.jpg')
+		shutil.copy('./test.wav', './testTree/subdir1/test_3.wav')
+		os.mkdir('./testTree/subdir2')
+		shutil.copy('./test.jpg', './testTree/subdir2/test_1.jpg')
+
+	def tearDown(self):
+		shutil.rmtree('./testTree')
+
+	def test1(self):
+		pass
 
 #class TestItemsHandler(unittest.TestCase):
 #	def __init__(self):
