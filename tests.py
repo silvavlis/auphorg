@@ -88,6 +88,10 @@ class TestDbBackend(unittest.TestCase):
 			cur.execute("SELECT " + tag_name + " FROM files;")
 			tag = cur.fetchone()
 			self.assertTrue(tag == (test_file[tag_name],))
+		# test the addition of an existing poor image
+		test_file = self.test_file_poor_1
+		self.assertRaises(db_backend.ApoDbDupUniq, self._db.add_non_raw_file, test_file['path'], \
+			test_file['file_checksum'], test_file['content_checksum'])
 		# test the addition of a rich file
 		test_file = self.test_file_rich_1
 		self._db.add_rich_file(test_file['path'], test_file['file_checksum'], test_file['content_checksum'],

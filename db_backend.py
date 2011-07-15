@@ -51,7 +51,7 @@ SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
 class ApoDbError(ValueError):
 	pass
 
-class ApoDbValueError(ApoDbError):
+class ApoDbDupUniq(ApoDbError):
 	def __init__(self, item_type, field, value):
 		self.item_type = item_type
 		self.field = field
@@ -60,6 +60,15 @@ class ApoDbValueError(ApoDbError):
 	def __str__(self):
 		return 'there is already a %s with %s = %s' % \
 			(self.item_type, self.field, self.value)
+
+class ApoDbMissingFile(ApoDbError):
+	def __init__(self, missing_file, name):
+		self.missing_file = missing_file
+		self.name = name
+
+	def __str__(self):
+		return 'trying to associate the non-existing file %s to the item %s!' % \
+			(self.missing_file, self.name)
 
 #
 class DbConnector:
@@ -98,19 +107,20 @@ class DbConnector:
 			field_values.append(values[field])
 		field_names = field_names[:-2]
 		field_placeholders = field_placeholders[:-2]
+		sql_insert = 'INSERT INTO %s (%s) VALUES (%s);' % \
+			(table, field_names, field_placeholders)
 		try:
-			sql_insert = 'INSERT INTO %s (%s) VALUES (%s);' % \
-				(table, field_names, field_placeholders)
 			self._db_curs.execute(sql_insert, field_values)
 			self._photos_db.commit()
 		except sqlite3.IntegrityError, err:
 			dup_field = re.match(r'column (.*) is not unique', str(err))
-			if (dup_fieldm == None):
+			if (dup_field == None):
 				raise
 			else:
 				err_field = dup_field.group(1)
 				item_type = table[:-1]
-				raise AopDbValueError(item_type, err_field, values[err_field])
+				raise ApoDbDupUniq(item_type, err_field, values[err_field])
+		return self._db_curs.lastrowid
 
 	def add_non_raw_file(self, path, file_checksum, content_checksum):
 		'adds a file without metadata to the DB'
@@ -132,16 +142,18 @@ class DbConnector:
 						tags_list = '',	hierarchical_subject = '',
 						subject = '', keywords = ''):
 		'adds a tags item to the DB'
-		cur = self._db_curs
-		cur.execute('INSERT INTO tags (Model, Software, DateTimeOriginal, ' + \
-					'CreateDate, ImageWidth, ImageHeight, TagsList, ' + \
-					'HierarchicalSubject, Subject, Keywords) ' + \
-					'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', 
-					(model, software, date_time_original, create_date, 
-					image_width, image_height, tags_list, 
-					hierarchical_subject, subject, keywords))
-		self._photos_db.commit()
-		return cur.lastrowid
+		values = {}
+		values['Model'] = model
+		values['Software'] = software
+		values['DateTimeOriginal'] = date_time_original
+		values['CreateDate'] = create_date
+		values['ImageWidth'] = image_width
+		values['ImageHeight'] = image_height
+		values['TagsList'] = tags_list
+		values['HierarchicalSubject'] = hierarchical_subject
+		values['Subject'] = subject
+		values['Keywords'] = keywords
+		return self._insert_element('tags', values)
 
 	def add_rich_file(self, path, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
@@ -186,7 +198,7 @@ class DbConnector:
 		try:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
-			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (content_file, name)
+			raise ApoDbMissingFile(content_file, item_name)
 		cur.execute('SELECT content_file FROM items WHERE name = ?;', (name,))
 		self._db_curs.execute('UPDATE simple_items SET content_file = ? WHERE name = ?;', (content_file_id, name))
 		self._photos_db.commit()
@@ -199,7 +211,7 @@ class DbConnector:
 		try:
 			tags_file_id = cur.fetchone()[0]
 		except TypeError:
-			raise IndexError, "trying to associate the non-existing file %s to the item %s!" % (tags_file, name)
+			raise ApoDbMissingFile(tags_file, item_name)
 		self._db_curs.execute('UPDATE simple_items SET tags_file = ? WHERE name = ?;', (tags_file_id, name))
 		self._photos_db.commit()
 		return self._db_curs.lastrowid
