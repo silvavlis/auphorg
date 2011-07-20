@@ -23,6 +23,7 @@ SCHEMA_TAGS = 'CREATE TABLE tags (' + \
 SCHEMA_FILES = 'CREATE TABLE files (' + \
 									'file_id INTEGER PRIMARY KEY ASC, ' + \
 									'path TEXT UNIQUE, ' + \
+									'timestamp TEXT, ' + \
 									'file_checksum TEXT, ' + \
 									'content_checksum TEXT, ' + \
 									'tags REFERENCES tags(tags_id));'
@@ -147,17 +148,19 @@ class DbConnector:
 				raise ApoDbDupUniq(item_type, err_field, values[err_field])
 		return self._db_curs.lastrowid
 
-	def add_non_raw_file(self, path, file_checksum, content_checksum):
+	def add_non_raw_file(self, path, timestamp, file_checksum, content_checksum):
 		'adds a file without metadata to the DB'
 		self._edit_element('files', {\
 			'path': path, \
+			'timestamp': timestamp, \
 			'file_checksum': file_checksum, \
 			'content_checksum': content_checksum})
 
-	def add_raw_file(self, path, file_checksum):
+	def add_raw_file(self, path, timestamp, file_checksum):
 		'adds a file without metadata to the DB'
 		self._edit_element('files', {\
 			'path': path, \
+			'timestamp': timestamp, \
 			'file_checksum': file_checksum})
 
 	def add_tags(self, model = '', software = '', date_time_original = '',
@@ -178,7 +181,7 @@ class DbConnector:
 			'Keywords': keywords})
 		return rowid
 
-	def add_rich_file(self, path, file_checksum, image_checksum, tags):
+	def add_rich_file(self, path, timestamp, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
 		tags_index = self.add_tags(tags['Model'], tags['Software'], 
 										tags['DateTimeOriginal'], tags['CreateDate'], 
@@ -187,6 +190,7 @@ class DbConnector:
 										tags['Subject'], tags['Keywords'])
 		self._edit_element('files', { \
 			'path': path, \
+			'timestamp': timestamp, \
 			'file_checksum': file_checksum, \
 			'content_checksum': image_checksum, \
 			'tags': tags_index})
