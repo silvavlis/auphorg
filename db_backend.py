@@ -149,36 +149,34 @@ class DbConnector:
 
 	def add_non_raw_file(self, path, file_checksum, content_checksum):
 		'adds a file without metadata to the DB'
-		values = {}
-		values['path'] = path
-		values['file_checksum'] = file_checksum
-		values['content_checksum'] = content_checksum
-		self._edit_element('files', values)
+		self._edit_element('files', {\
+			'path': path, \
+			'file_checksum': file_checksum, \
+			'content_checksum': content_checksum})
 
 	def add_raw_file(self, path, file_checksum):
 		'adds a file without metadata to the DB'
-		values = {}
-		values['path'] = path
-		values['file_checksum'] = file_checksum
-		self._edit_element('files', values)
+		self._edit_element('files', {\
+			'path': path, \
+			'file_checksum': file_checksum})
 
 	def add_tags(self, model = '', software = '', date_time_original = '',
 						create_date = '', image_width = '', image_height = '',
 						tags_list = '',	hierarchical_subject = '',
 						subject = '', keywords = ''):
 		'adds a tags item to the DB'
-		values = {}
-		values['Model'] = model
-		values['Software'] = software
-		values['DateTimeOriginal'] = date_time_original
-		values['CreateDate'] = create_date
-		values['ImageWidth'] = image_width
-		values['ImageHeight'] = image_height
-		values['TagsList'] = tags_list
-		values['HierarchicalSubject'] = hierarchical_subject
-		values['Subject'] = subject
-		values['Keywords'] = keywords
-		return self._edit_element('tags', values)
+		rowid = self._edit_element('tags', { \
+			'Model': model, \
+			'Software': software, \
+			'DateTimeOriginal': date_time_original, \
+			'CreateDate': create_date, \
+			'ImageWidth': image_width, \
+			'ImageHeight': image_height, \
+			'TagsList': tags_list, \
+			'HierarchicalSubject': hierarchical_subject, \
+			'Subject': subject, \
+			'Keywords': keywords})
+		return rowid
 
 	def add_rich_file(self, path, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
@@ -187,12 +185,11 @@ class DbConnector:
 										tags['ImageWidth'], tags['ImageHeight'], 
 										tags['TagsList'], tags['HierarchicalSubject'], 
 										tags['Subject'], tags['Keywords'])
-		values = {}
-		values['path'] = path
-		values['file_checksum'] = file_checksum
-		values['content_checksum'] = image_checksum
-		values['tags'] = tags_index
-		self._edit_element('files', values)
+		self._edit_element('files', { \
+			'path': path, \
+			'file_checksum': file_checksum, \
+			'content_checksum': image_checksum, \
+			'tags': tags_index})
 
 	def get_rich_file_tags(self, path):
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
@@ -268,7 +265,6 @@ class DbConnector:
 		except TypeError:
 			raise IndexError, "trying to a associate the file %s to the unknown ' + \
 				'item %s in an 'other file' relationship!" % (file_path, item_name)
-		values = {}
-		values['file'] = file_id
-		values['item'] = item_id
-		self._edit_element('other_files', values)
+		self._edit_element('other_files', { \
+			'file': file_id, \
+			'item': item_id})
