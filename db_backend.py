@@ -96,21 +96,46 @@ class DbConnector:
 		'closes the connection to the DB before destroying the object'
 		self._photos_db.close()
 
-	def _insert_element(self, table, values):	
-		'inserts the specified values in table, explicitly reporting duplications'
+	def _insert_query(self, table, values):
 		field_names = ''
 		field_placeholders = ''
-		field_values = []
+		query_values = []
 		for field in values.keys():
 			field_names += field + ', '
 			field_placeholders += '?, '
-			field_values.append(values[field])
+			query_values.append(values[field])
 		field_names = field_names[:-2]
 		field_placeholders = field_placeholders[:-2]
-		sql_insert = 'INSERT INTO %s (%s) VALUES (%s);' % \
+		sql_query = 'INSERT INTO %s (%s) VALUES (%s);' % \
 			(table, field_names, field_placeholders)
+		return (sql_query, query_values)
+
+	def _update_query(self, table, values, element_filters):
+		field_names = ''
+		field_placeholders = ''
+		query_values = []
+		for field in values.keys():
+			field_names += field
+			field_names += ' = ?, '
+			query_values.append(values[field])
+		filter_names = ''
+		for field_filter in element_filters.keys():
+			filter_names += field_filter + ' = ?, '
+			query_values.append(element_filters[field_filter])
+		filter_names = filter_names[:-2]
+		field_names = field_names[:-2]
+		sql_query = 'UPDATE %s SET %s WHERE %s;' % \
+			(table, field_names, filter_names)
+		return (sql_query, query_values)
+
+	def _edit_element(self, table, values, element_filters = None):	
+		'inserts the specified values in table, explicitly reporting duplications'
+		if (element_filters == None):
+			(sql_query, query_values) = self._insert_query(table, values)
+		else:
+			(sql_query, query_values) = self._update_query(table, values, element_filters)
 		try:
-			self._db_curs.execute(sql_insert, field_values)
+			self._db_curs.execute(sql_query, query_values)
 			self._photos_db.commit()
 		except sqlite3.IntegrityError, err:
 			dup_field = re.match(r'column (.*) is not unique', str(err))
@@ -128,14 +153,14 @@ class DbConnector:
 		values['path'] = path
 		values['file_checksum'] = file_checksum
 		values['content_checksum'] = content_checksum
-		self._insert_element('files', values)
+		self._edit_element('files', values)
 
 	def add_raw_file(self, path, file_checksum):
 		'adds a file without metadata to the DB'
 		values = {}
 		values['path'] = path
 		values['file_checksum'] = file_checksum
-		self._insert_element('files', values)
+		self._edit_element('files', values)
 
 	def add_tags(self, model = '', software = '', date_time_original = '',
 						create_date = '', image_width = '', image_height = '',
@@ -153,7 +178,7 @@ class DbConnector:
 		values['HierarchicalSubject'] = hierarchical_subject
 		values['Subject'] = subject
 		values['Keywords'] = keywords
-		return self._insert_element('tags', values)
+		return self._edit_element('tags', values)
 
 	def add_rich_file(self, path, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
@@ -167,7 +192,7 @@ class DbConnector:
 		values['file_checksum'] = file_checksum
 		values['content_checksum'] = image_checksum
 		values['tags'] = tags_index
-		self._insert_element('files', values)
+		self._edit_element('files', values)
 
 	def get_rich_file_tags(self, path):
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
@@ -187,9 +212,7 @@ class DbConnector:
 
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
-		values = {}
-		values['name'] = name
-		self._insert_element('simple_items', values)
+		self._edit_element('simple_items', {'name': name})
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
@@ -200,9 +223,10 @@ class DbConnector:
 		except TypeError:
 			raise ApoDbMissingFile(content_file, item_name)
 		cur.execute('SELECT content_file FROM items WHERE name = ?;', (name,))
-		self._db_curs.execute('UPDATE simple_items SET content_file = ? WHERE name = ?;', (content_file_id, name))
-		self._photos_db.commit()
-		return self._db_curs.lastrowid
+		self._edit_element('simple_items', {'content_file': content_file_id}, {'name': name})
+#		self._db_curs.execute('UPDATE simple_items SET content_file = ? WHERE name = ?;', (content_file_id, name))
+#		self._photos_db.commit()
+#		return self._db_curs.lastrowid
 
 	def add_item_tags(self, name, tags_file):
 		'adds a tags file to a multimedia item into the DB'
@@ -244,7 +268,7 @@ class DbConnector:
 		except TypeError:
 			raise IndexError, "trying to a associate the file %s to the unknown ' + \
 				'item %s in an 'other file' relationship!" % (file_path, item_name)
-		cur.execute('INSERT INTO other_files (file, item) ' + \
-						'VALUES (?, ?);', (file_id, item_id))
-		self._photos_db.commit()
-		return cur.lastrowid
+		values = {}
+		values['file'] = file_id
+		values['item'] = item_id
+		self._edit_element('other_files', values)
