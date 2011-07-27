@@ -5,11 +5,9 @@ import unittest
 import sqlite3
 import os
 import shutil
-import logging
 
 import db_backend
 import files_handler
-import tree_scanner
 
 class TestDbBackend(unittest.TestCase):
 	test_tags = {'Model': u'mod',
@@ -62,7 +60,6 @@ class TestDbBackend(unittest.TestCase):
 
 	def tearDown(self):
 		# delete DB
-		self._db = None
 		os.remove(self._db_path)
 
 	def test_db_creation(self):
@@ -94,7 +91,7 @@ class TestDbBackend(unittest.TestCase):
 		for tag_name in test_file.keys():
 			cur.execute("SELECT " + tag_name + " FROM files;")
 			tag = cur.fetchone()
-			self.assertEqual(tag, (test_file[tag_name],))
+			self.assertTrue(tag == (test_file[tag_name],))
 		# test the addition of an existing poor image
 		test_file = self.test_file_poor_1
 		self.assertRaises(db_backend.ApoDbDupUniq, self._db.add_non_raw_file, test_file['path'], \
@@ -144,16 +141,6 @@ class TestDbBackend(unittest.TestCase):
 
 	def test_get(self):
 		'test that getting an item works'
-		# test the file tags get failure
-		test_file = self.test_file_rich_1
-		tags = self._db.get_rich_file_tags(test_file['path'])
-		print 'get tags: ' + tags
-		# test the item get failure
-		(item_name, content_file, tags_file, extra_files) = self._db.get_item(self.test_item['name'])
-		print 'get item ' + item_name, content_file, tags_file, extra_files
-		self.assertTrue(content_file == self.test_item['content_file'])
-		self.assertTrue(tags_file == self.test_item['tags_file'])
-		self.assertTrue(extra_files == [self.test_file_poor_2['path'], self.test_file_poor_3['path']])
 		# add the item
 		test_file = self.test_file_poor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
@@ -358,8 +345,8 @@ class TestTreeScanner(unittest.TestCase):
 	def tearDown(self):
 		shutil.rmtree('./testTree')
 
-	def testTreeScanned(self):
-		tree_scanner.TreeScanner('./testTree')
+	def test1(self):
+		pass
 
 #class TestItemsHandler(unittest.TestCase):
 #	def __init__(self):
@@ -375,10 +362,4 @@ class TestTreeScanner(unittest.TestCase):
 #		pass
 #
 if __name__ == '__main__':
-	logger = logging.getLogger('AuPhOrg')
-	log_fh = logging.FileHandler('./auphorg.log')
-	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
-	log_fh.setFormatter(formatter)
-	logger.addHandler(log_fh)
-	logger.setLevel(logging.INFO)
 	unittest.main()
