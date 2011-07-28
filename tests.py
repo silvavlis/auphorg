@@ -5,6 +5,7 @@ import unittest
 import sqlite3
 import os
 import shutil
+import logging
 
 import db_backend
 import files_handler
@@ -60,6 +61,7 @@ class TestDbBackend(unittest.TestCase):
 
 	def tearDown(self):
 		# delete DB
+		self._db = None
 		os.remove(self._db_path)
 
 	def test_db_creation(self):
@@ -91,7 +93,7 @@ class TestDbBackend(unittest.TestCase):
 		for tag_name in test_file.keys():
 			cur.execute("SELECT " + tag_name + " FROM files;")
 			tag = cur.fetchone()
-			self.assertTrue(tag == (test_file[tag_name],))
+			self.assertEqual(tag, (test_file[tag_name],))
 		# test the addition of an existing poor image
 		test_file = self.test_file_poor_1
 		self.assertRaises(db_backend.ApoDbDupUniq, self._db.add_non_raw_file, test_file['path'], \
@@ -141,6 +143,14 @@ class TestDbBackend(unittest.TestCase):
 
 	def test_get(self):
 		'test that getting an item works'
+		# test the file tags get failure
+		test_file = self.test_file_rich_1
+		tags = self._db.get_rich_file_tags(test_file['path'])
+		# test the item get failure
+		(item_name, content_file, tags_file, extra_files) = self._db.get_item(self.test_item['name'])
+		self.assertTrue(content_file == self.test_item['content_file'])
+		self.assertTrue(tags_file == self.test_item['tags_file'])
+		self.assertTrue(extra_files == [self.test_file_poor_2['path'], self.test_file_poor_3['path']])
 		# add the item
 		test_file = self.test_file_poor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
@@ -328,38 +338,16 @@ class TestFilesHandler(unittest.TestCase):
 			'79a5c45b8250758'
 		self.assertTrue(content_checksum == CONTENT_CHECKSUM)
 
-class TestTreeScanner(unittest.TestCase):
-	def setUp(self):
-		if os.path.exists('./testTree'):
-			shutil.rmtree('./testTree')
-		os.mkdir('./testTree')
-		os.mkdir('./testTree/subdir1')
-		shutil.copy('./test.jpg', './testTree/subdir1/test_1.jpg')
-		shutil.copy('./test.jpg', './testTree/subdir1/test_2.jpg')
-		shutil.copy('./test.avi', './testTree/subdir1/test_2.avi')
-		shutil.copy('./test.jpg', './testTree/subdir1/test_3.jpg')
-		shutil.copy('./test.wav', './testTree/subdir1/test_3.wav')
-		os.mkdir('./testTree/subdir2')
-		shutil.copy('./test.jpg', './testTree/subdir2/test_1.jpg')
-
-	def tearDown(self):
-		shutil.rmtree('./testTree')
-
-	def test1(self):
-		pass
-
-#class TestItemsHandler(unittest.TestCase):
-#	def __init__(self):
-#		pass
-#
-#	def setUp(self):
-#		pass
-#
-#	def tearDown(self):
-#		pass
-#
-#	def testGetItem(self):
-#		pass
-#
 if __name__ == '__main__':
-	unittest.main()
+	# configure the logging
+	logger = logging.getLogger('AuPhOrg')
+	log_fh = logging.FileHandler('./auphorg.log')
+	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
+	log_fh.setFormatter(formatter)
+	logger.addHandler(log_fh)
+	logger.setLevel(logging.INFO)
+	# start the tests
+	testDbBackend_suite = unittest.TestLoader().loadTestsFromTestCase(TestDbBackend)
+	unittest.TextTestRunner(verbosity=2).run(testDbBackend_suite)
+	testFilesHandler_suite = unittest.TestLoader().loadTestsFromTestCase(TestFilesHandler)
+	unittest.TextTestRunner(verbosity=2).run(testFilesHandler_suite)
