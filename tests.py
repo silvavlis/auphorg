@@ -6,6 +6,7 @@ import sqlite3
 import os
 import shutil
 import logging
+import optparse
 
 import db_backend
 import files_handler
@@ -339,6 +340,12 @@ class TestFilesHandler(unittest.TestCase):
 		self.assertTrue(content_checksum == CONTENT_CHECKSUM)
 
 if __name__ == '__main__':
+	# get the arguments
+	argsParser = optparse.OptionParser()
+	argsParser.add_option('-d', '--db-backend', action='store_true', dest='test_db_backend', default=False)
+	argsParser.add_option('-f', '--files-handler', action='store_true', dest='test_files_handler', default=False)
+	argsParser.add_option('-a', '--all', action='store_true', dest='all_tests', default=False)
+	(options, args) = argsParser.parse_args()
 	# configure the logging
 	logger = logging.getLogger('AuPhOrg')
 	log_fh = logging.FileHandler('./auphorg.log')
@@ -347,7 +354,12 @@ if __name__ == '__main__':
 	logger.addHandler(log_fh)
 	logger.setLevel(logging.INFO)
 	# start the tests
-	testDbBackend_suite = unittest.TestLoader().loadTestsFromTestCase(TestDbBackend)
-	unittest.TextTestRunner(verbosity=2).run(testDbBackend_suite)
-	testFilesHandler_suite = unittest.TestLoader().loadTestsFromTestCase(TestFilesHandler)
-	unittest.TextTestRunner(verbosity=2).run(testFilesHandler_suite)
+	if options.all_tests:
+		test_db_backend = True
+		test_files_handler = True
+	if options.test_db_backend:
+		testDbBackend_suite = unittest.TestLoader().loadTestsFromTestCase(TestDbBackend)
+		unittest.TextTestRunner(verbosity=2).run(testDbBackend_suite)
+	if options.test_files_handler:
+		testFilesHandler_suite = unittest.TestLoader().loadTestsFromTestCase(TestFilesHandler)
+		unittest.TextTestRunner(verbosity=2).run(testFilesHandler_suite)
