@@ -79,6 +79,17 @@ class ApoDbMissingFile(ApoDbError):
 		self._logger.error(err_msg)
 		return err_msg
 
+class ApoDbMissingTags(ApoDbError):
+	def __init__(self, path):
+		super(ApoDbMissingTags, self).__init__()
+		self.path = path
+
+	def __str__(self):
+		err_msg = 'trying to get the tags of the file %s!' % \
+			(self.path)
+		self._logger.error(err_msg)
+		return err_msg
+
 #
 class DbConnector:
 	def __init__(self, db_path=''):
@@ -229,6 +240,8 @@ class DbConnector:
 		self._logger.info('getting tags of rich file %s', path)
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
 		tags_list = self._db_curs.fetchone()
+		if tags_list == None:
+			raise ApoDbMissingTags(path)
 		tags = {}
 		tags['Model'] = tags_list[1]
 		tags['Software'] = tags_list[2]
