@@ -96,6 +96,10 @@ class DbConnector:
 		'connects to DB for saving collection'
 		self._logger = logging.getLogger('AuPhOrg')
 		if db_path == '':
+			if os.path.exists(DB_PATH_TEST):
+				self._logger.warning('test DB already exists in %s, removing it' % DB_PATH_TEST)
+				os.remove(DB_PATH_TEST)
+				self._logger.warning('test DB removed')
 			db_path = DB_PATH_TEST
 		self._logger.info('connecting to DB %s' % db_path)
 		self._db_path = db_path
@@ -237,6 +241,7 @@ class DbConnector:
 		self._logger.info('rich file added')
 
 	def get_rich_file_tags(self, path):
+		'gets the tags of a rich file'
 		self._logger.info('getting tags of rich file %s', path)
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
 		tags_list = self._db_curs.fetchone()
@@ -297,6 +302,9 @@ class DbConnector:
 			(item_name, content_file, tags_file, extra_files) = self._db_curs.fetchone()
 		except TypeError, err:
 			if (str(err) == "'NoneType' object is not iterable"):
+				self._db_curs.execute('SELECT * FROM items;')
+				print str(self._db_curs.fetchall())
+				self._logger.warning("item %s doesn't exist yet" % item_name)
 				return None
 			else:
 				raise
