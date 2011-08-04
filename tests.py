@@ -92,7 +92,7 @@ class TestDbBackend(unittest.TestCase):
 		test_file = self.test_file_poor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
 		for tag_name in test_file.keys():
-			cur.execute("SELECT " + tag_name + " FROM files;")
+			cur.execute("SELECT " + tag_name + " FROM files WHERE path = ?;", (test_file['path'],))
 			tag = cur.fetchone()
 			self.assertEqual(tag, (test_file[tag_name],))
 		# test the addition of an existing poor image
@@ -101,8 +101,8 @@ class TestDbBackend(unittest.TestCase):
 			test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
 		# test the addition of a rich file
 		test_file = self.test_file_rich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'],
-			test_file['tags'])
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], 
+			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		for tag_name in test_file.keys():
 			if tag_name != 'tags':
 				cur.execute("SELECT " + tag_name + " FROM files WHERE path = '" + test_file['path'] + "';")
@@ -123,11 +123,13 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(values[0][0] == test_item['name'])
 		# test the addition of a content file to the item
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
-		cur.execute("SELECT content_file FROM simple_items;")
-		value = cur.fetchone()[0]
-		cur.execute("SELECT path FROM files WHERE file_id = %d;" % value)
+		cur.execute("SELECT path FROM files, simple_items WHERE file_id = content_file;")
 		value = cur.fetchone()[0]
 		self.assertTrue(value == self.test_item['content_file'])
+		# test the addition of a second content file to the item
+		test_file = self.test_file_poor_2
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+		self.assertRaises(db_backend.ApoDbContentExists, self._db.add_item_content, test_item['name'], test_item['content_file'])
 		# test the addition of a tags file to the item
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		cur.execute("SELECT tags_file FROM simple_items;")
@@ -137,7 +139,6 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(value == self.test_item['tags_file'])
 		# test the addition of an extra file to the item
 		test_file = self.test_file_poor_2
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		# close DB connection
 		db.close()
@@ -149,14 +150,17 @@ class TestDbBackend(unittest.TestCase):
 		self.assertRaises(db_backend.ApoDbMissingTags, self._db.get_rich_file_tags, test_file['path'])
 		# test the item get failure
 		self.assertEquals(self._db.get_item(self.test_item['name']), None)
-		# add the item
+		# add a content file to the item and test it
 		test_file = self.test_file_poor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
-		test_file = self.test_file_rich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		test_item = self.test_item
 		self._db.add_item(test_item['name'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
+		(item_name, content_file, tags_file, extra_files) = self._db.get_item(test_item['name'])
+		self.assertTrue(content_file == self.test_item['content_file'])
+		# add a tags file to the item and test it
+		test_file = self.test_file_rich_1
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		test_file = self.test_file_poor_2
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
@@ -341,22 +345,30 @@ if __name__ == '__main__':
 	argsParser = optparse.OptionParser()
 	argsParser.add_option('-d', '--db-backend', action='store_true', dest='test_db_backend', default=False)
 	argsParser.add_option('-f', '--files-handler', action='store_true', dest='test_files_handler', default=False)
+	argsParser.add_option('-t', '--tree-scanner', action='store_true', dest='test_tree_scanner', default=False)
 	argsParser.add_option('-a', '--all', action='store_true', dest='all_tests', default=False)
 	(options, args) = argsParser.parse_args()
 	# configure the logging
 	logger = logging.getLogger('AuPhOrg')
 	log_fh = logging.FileHandler('./auphorg.log')
+	log_so = logging.StreamHandler()
 	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
 	log_fh.setFormatter(formatter)
+	log_so.setFormatter(formatter)
 	logger.addHandler(log_fh)
+#	logger.addHandler(log_so)
 	logger.setLevel(logging.INFO)
 	# start the tests
 	if options.all_tests:
 		options.test_db_backend = True
 		options.test_files_handler = True
+		options.test_tree_scanner = True
 	if options.test_db_backend:
 		testDbBackend_suite = unittest.TestLoader().loadTestsFromTestCase(TestDbBackend)
 		unittest.TextTestRunner(verbosity=2).run(testDbBackend_suite)
 	if options.test_files_handler:
 		testFilesHandler_suite = unittest.TestLoader().loadTestsFromTestCase(TestFilesHandler)
 		unittest.TextTestRunner(verbosity=2).run(testFilesHandler_suite)
+	if options.test_tree_scanner:
+		testTreeScanner_suite = unittest.TestLoader().loadTestsFromTestCase(TestTreeScanner)
+		unittest.TextTestRunner(verbosity=2).run(testTreeScanner_suite)

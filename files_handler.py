@@ -104,6 +104,7 @@ class FilesHandler:
 		file_time = os.path.getmtime(path)
 		# add the file to the DB and to the item
 		self._db.add_rich_file(path, file_time, file_checksum, content_checksum, exif_tags)
+		self._db.add_item_tags(item_name, path)
 		self._logger.info('JPEG file added to item')
 
 	def _add_image(self, item_name, path):
@@ -116,6 +117,7 @@ class FilesHandler:
 		file_time = os.path.getmtime(path)
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
+		self._db.add_item_content(item_name, path)
 		self._logger.info('TIFF file added to item')
 
 	def _video_checksum(self, path):
@@ -137,6 +139,7 @@ class FilesHandler:
 		file_time = os.path.getmtime(path)
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
+		self._db.add_item_content(item_name, path)
 		self._logger.info('video file added to item')
 
 	def _wav_checksum(self, path):
@@ -161,6 +164,7 @@ class FilesHandler:
 		file_time = os.path.getmtime(path)
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_checksum, content_checksum)
+		self._db.add_item_content(item_name, path)
 		self._logger.info('audio file added to item')
 
 	def is_older(self, path):
@@ -179,7 +183,9 @@ class FilesHandler:
 		item = self._db.get_item(item_name)
 		# if item doesn't exist, create a new item for the file
 		if (item == None):
+			self._logger.info("adding the item %s, because it didn't existed yet" % item_name)
 			self._db.add_item(item_name)
+			self._logger.info("item added for the file %s" % path)
 		# if JPEG file
 		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 			self._add_jpeg(item_name, path)

@@ -41,13 +41,15 @@ SCHEMA_ITEM_INDEX = 'CREATE INDEX item_name ON simple_items(name);'
 SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
 									'SELECT i.name AS name, ' + \
 									'cf.path AS content_file, ' + \
-									'tf.path AS tags_file, ' + \
-									'group_concat(ef.path,"|") AS extra_files ' + \
-									'FROM simple_items i, files cf, files tf, files ef, other_files of ' + \
+									'tf.path AS tags_file ' + \
+									'FROM simple_items i, files cf, files tf ' + \
 									'WHERE i.content_file = cf.file_id AND ' + \
-									'i.tags_file = tf.file_id AND ' + \
-									'i.item_id = of.item AND ' + \
-									'of.file = ef.file_id;'
+									'i.tags_file = tf.file_id;'
+SCHEMA_EXTRA_FILES_VIEW = 'CREATE VIEW items_extra_files AS ' + \
+									'SELECT i.name AS name, ' + \
+									'group_concat(ef.path,"|") AS extra_files ' + \
+									'FROM simple_items i, files ef, other_files of ' + \
+									'WHERE i.item_id = of.item AND of.file = ef.file_id;'
 
 # exceptions
 class ApoDbError(ValueError):
@@ -62,7 +64,7 @@ class ApoDbDupUniq(ApoDbError):
 		self.value = value
 
 	def __str__(self):
-		err_msg = 'there is already a %s with %s = %s' % \
+		err_msg = 'there is already a "%s" with "%s" = "%s"' % \
 			(self.item_type, self.field, self.value)
 		self._logger.error(err_msg)
 		return err_msg
@@ -74,7 +76,7 @@ class ApoDbMissingFile(ApoDbError):
 		self.name = name
 
 	def __str__(self):
-		err_msg = 'trying to associate the non-existing file %s to the item %s!' % \
+		err_msg = 'trying to associate the non-existing file "%s" to the item "%s"!' % \
 			(self.missing_file, self.name)
 		self._logger.error(err_msg)
 		return err_msg
@@ -85,8 +87,20 @@ class ApoDbMissingTags(ApoDbError):
 		self.path = path
 
 	def __str__(self):
-		err_msg = 'trying to get the tags of the file %s!' % \
+		err_msg = 'trying to get the tags of the file "%s"!' % \
 			(self.path)
+		self._logger.error(err_msg)
+		return err_msg
+
+class ApoDbContentExists(ApoDbError):
+	def __init__(self, content_file, name):
+		super(ApoDbContentExists, self).__init__()
+		self.content_file = content_file
+		self.name = name
+
+	def __str__(self):
+		err_msg = 'trying to associate the content file "%s" to the item "%s", but it already has one!' % \
+			(self.content_file, self.name)
 		self._logger.error(err_msg)
 		return err_msg
 
@@ -114,6 +128,10 @@ class DbConnector:
 			self._db_curs.execute(SCHEMA_FILE_INDEX)
 			self._db_curs.execute(SCHEMA_ITEM_INDEX)
 			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
+			self._db_curs.execute(SCHEMA_EXTRA_FILES_VIEW)
+			self._photos_db.commit()
+			self._db_curs.execute('INSERT INTO files ("path") VALUES (NULL);');
+			self.no_file_id = self._db_curs.lastrowid
 			self._photos_db.commit()
 		self._logger.info('tables added to the DB')
 
@@ -259,19 +277,23 @@ class DbConnector:
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
 		self._logger.info('adding item %s' % name)
-		self._edit_element('simple_items', {'name': name})
+		self._edit_element('simple_items', {'name': name, 'content_file': self.no_file_id, 'tags_file': self.no_file_id})
 		self._logger.info('item added')
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
 		self._logger.info('adding to item %s the file %s as its content file' % (name, content_file))
+		# check that the item doesn't contain any content file yet
+		(_, cf, tf, _) = self.get_item(name)
+		if (cf != None) and (cf != tf):
+			raise ApoDbContentExists(content_file, name)
+		# add the content file to the item
 		cur = self._db_curs
 		cur.execute('SELECT file_id FROM files WHERE path = "%s";' % content_file)
 		try:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise ApoDbMissingFile(content_file, item_name)
-		cur.execute('SELECT content_file FROM items WHERE name = ?;', (name,))
 		self._edit_element('simple_items', {'content_file': content_file_id}, {'name': name})
 		self._logger.info('item added')
 
@@ -284,23 +306,27 @@ class DbConnector:
 			tags_file_id = cur.fetchone()[0]
 		except TypeError:
 			raise ApoDbMissingFile(tags_file, item_name)
-		self._db_curs.execute('UPDATE simple_items SET tags_file = ? WHERE name = ?;', (tags_file_id, name))
-		self._photos_db.commit()
+		self._edit_element('simple_items', {'tags_file': tags_file_id}, {'name': name})
 		self._logger.info('item added')
-		return self._db_curs.lastrowid
 
 	def get_item(self, item_name):
 		'returns the specified item'
 		self._logger.info('getting item %s' % item_name)
 		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
 		try:
-			(item_name, content_file, tags_file, extra_files) = self._db_curs.fetchone()
+			(item_name, content_file, tags_file) = self._db_curs.fetchone()
 		except TypeError, err:
 			if (str(err) == "'NoneType' object is not iterable"):
+				self._logger.warning("item %s doesn't exist yet" % item_name)
 				return None
 			else:
 				raise
-		extra_files = extra_files.split('|')
+		if (content_file == None) and (tags_file != None):
+			content_file = tags_file
+		self._db_curs.execute('SELECT * FROM items_extra_files WHERE name = ?;', [item_name])
+		extra_files = self._db_curs.fetchone()
+		if extra_files != None:
+			extra_files = extra_files[1].split('|')
 		self._logger.info('item obtained')
 		return (item_name, content_file, tags_file, extra_files)
 
