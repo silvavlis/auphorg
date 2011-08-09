@@ -146,9 +146,6 @@ class DbConnector:
 			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
 			self._db_curs.execute(SCHEMA_EXTRA_FILES_VIEW)
 			self._photos_db.commit()
-			self._db_curs.execute('INSERT INTO files ("path") VALUES (NULL);');
-			self.no_file_id = self._db_curs.lastrowid
-			self._photos_db.commit()
 		self._logger.info('tables added to the DB')
 
 	def __del__(self):
@@ -294,7 +291,7 @@ class DbConnector:
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
 		self._logger.info('adding item %s' % name)
-		self._edit_element('simple_items', {'name': name, 'content_file': self.no_file_id, 'tags_file': self.no_file_id})
+		self._edit_element('simple_items', {'name': name})
 		self._logger.info('item added')
 
 	def add_item_content(self, name, content_file):
