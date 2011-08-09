@@ -42,9 +42,9 @@ SCHEMA_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
 									'SELECT i.name AS name, ' + \
 									'cf.path AS content_file, ' + \
 									'tf.path AS tags_file ' + \
-									'FROM simple_items i, files cf, files tf ' + \
-									'WHERE i.content_file = cf.file_id AND ' + \
-									'i.tags_file = tf.file_id;'
+									'FROM simple_items i ' + \
+									'LEFT JOIN files cf ON i.content_file = cf.file_id ' + \
+									'LEFT JOIN files tf ON i.tags_file = tf.file_id;'
 SCHEMA_EXTRA_FILES_VIEW = 'CREATE VIEW items_extra_files AS ' + \
 									'SELECT i.name AS name, ' + \
 									'group_concat(ef.path,"|") AS extra_files ' + \
@@ -101,6 +101,18 @@ class ApoDbContentExists(ApoDbError):
 	def __str__(self):
 		err_msg = 'trying to associate the content file "%s" to the item "%s", but it already has one!' % \
 			(self.content_file, self.name)
+		self._logger.error(err_msg)
+		return err_msg
+
+class ApoDbTagsExists(ApoDbError):
+	def __init__(self, tags_file, name):
+		super(ApoDbTagsExists, self).__init__()
+		self.tags_file = tags_file
+		self.name = name
+
+	def __str__(self):
+		err_msg = 'trying to associate the tags file "%s" to the item "%s", but it already has one!' % \
+			(self.tags_file, self.name)
 		self._logger.error(err_msg)
 		return err_msg
 
@@ -305,6 +317,11 @@ class DbConnector:
 	def add_item_tags(self, name, tags_file):
 		'adds a tags file to a multimedia item into the DB'
 		self._logger.info('adding to item %s the file %s as its metadata file' % (name, tags_file))
+		# check that the item doesn't contain any tags file yet
+		(_, cf, tf, _) = self.get_item(name)
+		if tf != None:
+			raise ApoDbTagsExists(tags_file, name)
+		# add the tags file to the item
 		cur = self._db_curs
 		cur.execute('SELECT file_id FROM files WHERE path = "%s";' % tags_file)
 		try:

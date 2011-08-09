@@ -25,25 +25,31 @@ class TestDbBackend(unittest.TestCase):
 				'Keywords': u'keyws'
 				}
 	test_file_poor_1 = {'path': u'/this/is/a/path_1',
-						'timestamp': u'12/32/3423 34:74:12',
+						'timestamp': u'12/32/3423 14:74:12',
 						'file_checksum': u'f1l3ch3cksum1',
 						'content_checksum': u'c0nt3ntch3cksum1'
 						}
 	test_file_rich_1 = {'path': u'/this/is/a/path_2',
-						'timestamp': u'12/32/3423 34:74:12',
+						'timestamp': u'12/32/3423 14:74:12',
 						'file_checksum': u'f1l3ch3cksum2',
 						'content_checksum': u'c0nt3ntch3cksum2',
 						'tags': test_tags
 						}
 	test_file_poor_2 = {'path': u'/this/is/a/path_3',
-						'timestamp': u'12/32/3423 34:74:12',
+						'timestamp': u'12/32/3423 14:74:12',
 						'file_checksum': u'f1l3ch3cksum3',
 						'content_checksum': u'c0nt3ntch3cksum3'
 						}
 	test_file_poor_3 = {'path': u'/this/is/a/path_4',
-						'timestamp': u'12/32/3423 34:74:12',
+						'timestamp': u'12/32/3423 14:74:12',
 						'file_checksum': u'f1l3ch3cksum4',
 						'content_checksum': u'c0nt3ntch3cksum4'
+						}
+	test_file_rich_2 = {'path': u'/this/is/a/path_5',
+						'timestamp': u'12/32/3423 14:74:12',
+						'file_checksum': u'f1l3ch3cksum5',
+						'content_checksum': u'c0nt3ntch3cksum5',
+						'tags': test_tags
 						}
 	test_item = {'name': u'/this/is/a/name', 
 						'content_file': test_file_poor_1['path'],
@@ -138,9 +144,14 @@ class TestDbBackend(unittest.TestCase):
 		cur.execute("SELECT path FROM files WHERE file_id = %d;" % value)
 		value = cur.fetchone()[0]
 		self.assertTrue(value == self.test_item['tags_file'])
+		# test the addition of a second tags file to the item
+		test_file = self.test_file_rich_2
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], 
+			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		# test the addition of an extra file to the item
 		test_file = self.test_file_poor_2
 		self._db.add_extra_file(test_file['path'], test_item['name'])
+		self.assertRaises(db_backend.ApoDbTagsExists, self._db.add_item_tags, test_item['name'], test_item['tags_file'])
 		# close DB connection
 		db.close()
 
