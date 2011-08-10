@@ -70,14 +70,14 @@ class ApoDbDupUniq(ApoDbError):
 		return err_msg
 
 class ApoDbMissingFile(ApoDbError):
-	def __init__(self, missing_file, name):
+	def __init__(self, missing_file, item_name):
 		super(ApoDbMissingFile, self).__init__()
 		self.missing_file = missing_file
-		self.name = name
+		self.item_name = item_name
 
 	def __str__(self):
 		err_msg = 'trying to associate the non-existing file "%s" to the item "%s"!' % \
-			(self.missing_file, self.name)
+			(self.missing_file, self.item_name)
 		self._logger.error(err_msg)
 		return err_msg
 
@@ -93,50 +93,69 @@ class ApoDbMissingTags(ApoDbError):
 		return err_msg
 
 class ApoDbContentExists(ApoDbError):
-	def __init__(self, content_file, name):
+	def __init__(self, content_file, item_name):
 		super(ApoDbContentExists, self).__init__()
 		self.content_file = content_file
-		self.name = name
+		self.item_name = item_name
 
 	def __str__(self):
 		err_msg = 'trying to associate the content file "%s" to the item "%s", but it already has one!' % \
-			(self.content_file, self.name)
+			(self.content_file, self.item_name)
+		self._logger.error(err_msg)
+		return err_msg
+
+class ApoDbNoMetadata(ApoDbError):
+	def __init__(self, item_name):
+		super(ApoDbNoMetadata, self).__init__()
+		self.item_name = item_name
+
+	def __str__(self):
+		err_msg = 'the item "%s" doesn\'t have any metadata' % \
+			(self.item_name)
 		self._logger.error(err_msg)
 		return err_msg
 
 class ApoDbTagsExists(ApoDbError):
-	def __init__(self, tags_file, name):
+	def __init__(self, tags_file, item_name):
 		super(ApoDbTagsExists, self).__init__()
 		self.tags_file = tags_file
-		self.name = name
+		self.item_name = item_name
 
 	def __str__(self):
 		err_msg = 'trying to associate the tags file "%s" to the item "%s", but it already has one!' % \
-			(self.tags_file, self.name)
+			(self.tags_file, self.item_name)
 		self._logger.error(err_msg)
 		return err_msg
 
-#
+# class that handles the interaction with the DB
 class DbConnector:
+	'controls the interaction with the program DB'
+
+	#
+	# Private methods
+	#
+
 	def __init__(self, db_path=''):
 		'connects to DB for saving collection'
+		# connect to the DB
 		self._logger = logging.getLogger('AuPhOrg')
+		self._logger.info('connecting to DB %s' % db_path)
 		if db_path == '':
+			# if no DB path given, then use the tests DB
 			if os.path.exists(DB_PATH_TEST):
 				self._logger.warning('test DB already exists in %s, removing it' % DB_PATH_TEST)
 				os.remove(DB_PATH_TEST)
 				self._logger.warning('test DB removed')
 			db_path = DB_PATH_TEST
-		self._logger.info('connecting to DB %s' % db_path)
 		self._db_path = db_path
 		self._photos_db = sqlite3.connect(self._db_path)
 		self._db_curs = self._photos_db.cursor()
 		self._logger.info('connection to DB established')
-		# if database doesn't have the tables yet, create them
-		self._logger.info('adding the tables to the DB')
+		# if database doesn't have the schema yet, create it
 		self._db_curs.execute("SELECT name FROM sqlite_master WHERE type='table';")
 		tables = self._db_curs.fetchall()
 		if (not (u'files',) in tables) or (not (u'simple_items',) in tables) or (not (u'tags',) in tables):
+			self._logger.info('adding the schema to the DB')
 			self._db_curs.execute(SCHEMA_TAGS)
 			self._db_curs.execute(SCHEMA_FILES)
 			self._db_curs.execute(SCHEMA_ITEMS)
@@ -146,7 +165,7 @@ class DbConnector:
 			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
 			self._db_curs.execute(SCHEMA_EXTRA_FILES_VIEW)
 			self._photos_db.commit()
-		self._logger.info('tables added to the DB')
+			self._logger.info('schema added to the DB')
 
 	def __del__(self):
 		'closes the connection to the DB before destroying the object'
@@ -155,6 +174,7 @@ class DbConnector:
 		self._logger.info('connection with DB closed')
 
 	def _insert_query(self, table, values):
+		'generates an SQL query for inserting "values" into "table"'
 		self._logger.info('adding an entry to table %s with values %s' % (table, str(values)))
 		field_names = ''
 		field_placeholders = ''
@@ -171,6 +191,7 @@ class DbConnector:
 		return (sql_query, query_values)
 
 	def _update_query(self, table, values, element_filters):
+		'generates an SQL query for changing the "values" from "table" that match "element_filters"'
 		self._logger.info('updating entry of table %s that matches filter %s with values %s' \
 			% (table, str(element_filters), str(values)))
 		field_names = ''
@@ -192,7 +213,7 @@ class DbConnector:
 		return (sql_query, query_values)
 
 	def _edit_element(self, table, values, element_filters = None):	
-		'inserts the specified values in table, explicitly reporting duplications'
+		'edits the specified "values" from "table", explicitly reporting duplications'
 		self._logger.info('editing entry of table %s' % table)
 		if (element_filters == None):
 			(sql_query, query_values) = self._insert_query(table, values)
@@ -212,30 +233,11 @@ class DbConnector:
 		self._logger.info('done editing entry')
 		return self._db_curs.lastrowid
 
-	def add_non_raw_file(self, path, timestamp, file_checksum, content_checksum):
-		'adds a file without metadata to the DB'
-		self._logger.info('adding non RAW file %s', path)
-		self._edit_element('files', {\
-			'path': path, \
-			'timestamp': timestamp, \
-			'file_checksum': file_checksum, \
-			'content_checksum': content_checksum})
-		self._logger.info('non RAW file added')
-
-	def add_raw_file(self, path, timestamp, file_checksum):
-		'adds a file without metadata to the DB'
-		self._logger.info('adding RAW file %s', path)
-		self._edit_element('files', {\
-			'path': path, \
-			'timestamp': timestamp, \
-			'file_checksum': file_checksum})
-		self._logger.info('RAW file added')
-
-	def add_tags(self, model = '', software = '', date_time_original = '',
+	def _add_tags(self, model = '', software = '', date_time_original = '',
 						create_date = '', image_width = '', image_height = '',
 						tags_list = '',	hierarchical_subject = '',
 						subject = '', keywords = ''):
-		'adds a tags item to the DB'
+		'adds some metadata to the DB'
 		self._logger.info('adding item tags')
 		rowid = self._edit_element('tags', { \
 			'Model': model, \
@@ -251,23 +253,7 @@ class DbConnector:
 		self._logger.info('item tags successfully added')
 		return rowid
 
-	def add_rich_file(self, path, timestamp, file_checksum, image_checksum, tags):
-		'adds a file with metadata to the DB'
-		self._logger.info('adding rich file %s', path)
-		tags_index = self.add_tags(tags['Model'], tags['Software'], 
-										tags['DateTimeOriginal'], tags['CreateDate'], 
-										tags['ImageWidth'], tags['ImageHeight'], 
-										tags['TagsList'], tags['HierarchicalSubject'], 
-										tags['Subject'], tags['Keywords'])
-		self._edit_element('files', { \
-			'path': path, \
-			'timestamp': timestamp, \
-			'file_checksum': file_checksum, \
-			'content_checksum': image_checksum, \
-			'tags': tags_index})
-		self._logger.info('rich file added')
-
-	def get_rich_file_tags(self, path):
+	def _get_rich_file_tags(self, path):
 		'gets the tags of a rich file'
 		self._logger.info('getting tags of rich file %s', path)
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
@@ -287,6 +273,45 @@ class DbConnector:
 		tags['Keywords'] = tags_list[10]
 		self._logger.info('tags of rich file obtained')
 		return tags
+
+	#
+	# Public methods
+	#
+
+	def add_non_raw_file(self, path, timestamp, file_checksum, content_checksum):
+		'adds a non raw file without metadata to the DB'
+		self._logger.info('adding non RAW file %s', path)
+		self._edit_element('files', {\
+			'path': path, \
+			'timestamp': timestamp, \
+			'file_checksum': file_checksum, \
+			'content_checksum': content_checksum})
+		self._logger.info('non RAW file added')
+
+	def add_raw_file(self, path, timestamp, file_checksum):
+		'adds a raw file without metadata to the DB'
+		self._logger.info('adding RAW file %s', path)
+		self._edit_element('files', {\
+			'path': path, \
+			'timestamp': timestamp, \
+			'file_checksum': file_checksum})
+		self._logger.info('RAW file added')
+
+	def add_rich_file(self, path, timestamp, file_checksum, image_checksum, tags):
+		'adds a file with metadata to the DB'
+		self._logger.info('adding rich file %s', path)
+		tags_index = self._add_tags(tags['Model'], tags['Software'], 
+										tags['DateTimeOriginal'], tags['CreateDate'], 
+										tags['ImageWidth'], tags['ImageHeight'], 
+										tags['TagsList'], tags['HierarchicalSubject'], 
+										tags['Subject'], tags['Keywords'])
+		self._edit_element('files', { \
+			'path': path, \
+			'timestamp': timestamp, \
+			'file_checksum': file_checksum, \
+			'content_checksum': image_checksum, \
+			'tags': tags_index})
+		self._logger.info('rich file added')
 
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
@@ -348,6 +373,18 @@ class DbConnector:
 			extra_files = extra_files[1].split('|')
 		self._logger.info('item obtained')
 		return (item_name, content_file, tags_file, extra_files)
+
+	def get_item_metadata(self, item_name):
+		'returns the tags of the tags file as the item metadata'
+		self._logger.info('getting metadata of item %s' % item_name)
+		self._db_curs.execute('SELECT tags_file FROM items WHERE i.name = ?', [item_name])
+		tags_file = self._db_curs.fetchone()[0]
+		if tags_file_id == None:
+			self._logger.warning("item %s doesn't have any metadata", item_name)
+			return None
+		tags = self._get_rich_file_tags(tags_file)
+		self._logger.info('item metadata obtained')
+		return tags
 
 	def add_extra_file(self, file_path, item_name):
 		'adds a relationship with an extra file to the DB'

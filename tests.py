@@ -97,7 +97,8 @@ class TestDbBackend(unittest.TestCase):
 		cur = db.cursor()
 		# test the addition of a poor image
 		test_file = self.test_file_poor_1
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'])
 		for tag_name in test_file.keys():
 			cur.execute("SELECT " + tag_name + " FROM files WHERE path = ?;", (test_file['path'],))
 			tag = cur.fetchone()
@@ -135,8 +136,10 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(value == self.test_item['content_file'])
 		# test the addition of a second content file to the item
 		test_file = self.test_file_poor_2
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
-		self.assertRaises(db_backend.ApoDbContentExists, self._db.add_item_content, test_item['name'], test_item['content_file'])
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'])
+		self.assertRaises(db_backend.ApoDbContentExists, self._db.add_item_content, \
+			test_item['name'], test_item['content_file'])
 		# test the addition of a tags file to the item
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		cur.execute("SELECT tags_file FROM simple_items;")
@@ -151,7 +154,8 @@ class TestDbBackend(unittest.TestCase):
 		# test the addition of an extra file to the item
 		test_file = self.test_file_poor_2
 		self._db.add_extra_file(test_file['path'], test_item['name'])
-		self.assertRaises(db_backend.ApoDbTagsExists, self._db.add_item_tags, test_item['name'], test_item['tags_file'])
+		self.assertRaises(db_backend.ApoDbTagsExists, self._db.add_item_tags, \
+			test_item['name'], test_item['tags_file'])
 		# close DB connection
 		db.close()
 
@@ -159,12 +163,13 @@ class TestDbBackend(unittest.TestCase):
 		'test that getting an item works'
 		# test the file tags get failure
 		test_file = self.test_file_rich_1
-		self.assertRaises(db_backend.ApoDbMissingTags, self._db.get_rich_file_tags, test_file['path'])
+		self.assertRaises(db_backend.ApoDbMissingTags, self._db._get_rich_file_tags, test_file['path'])
 		# test the item get failure
 		self.assertEquals(self._db.get_item(self.test_item['name']), None)
 		# add a content file to the item and test it
 		test_file = self.test_file_poor_1
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'])
 		test_item = self.test_item
 		self._db.add_item(test_item['name'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
@@ -172,17 +177,20 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(content_file == self.test_item['content_file'])
 		# add a tags file to the item and test it
 		test_file = self.test_file_rich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		test_file = self.test_file_poor_2
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		test_file = self.test_file_poor_3
-		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
+			test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		# test the file tags get
 		test_file = self.test_file_rich_1
-		tags = self._db.get_rich_file_tags(test_file['path'])
+		tags = self._db._get_rich_file_tags(test_file['path'])
 		for tag in self.test_tags:
 			self.assertTrue(tags[tag] == self.test_tags[tag])	
 		# test the item get
