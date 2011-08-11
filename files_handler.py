@@ -6,16 +6,13 @@ import db_backend
 import subprocess
 import logging
 
-TAGS_CLASSIFICATION = [
-				'FileName',
+TAGS_TO_GET = [
 				'Model',
 				'Software',
 				'DateTimeOriginal',
 				'CreateDate',
 				'ImageWidth',
-				'ImageHeight'
-				]
-TAGS_TO_GET = TAGS_CLASSIFICATION + [
+				'ImageHeight',
 				'TagsList',
 				'HierarchicalSubject',
 				'Subject',

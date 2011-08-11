@@ -233,26 +233,6 @@ class DbConnector:
 		self._logger.info('done editing entry')
 		return self._db_curs.lastrowid
 
-	def _add_tags(self, model = '', software = '', date_time_original = '',
-						create_date = '', image_width = '', image_height = '',
-						tags_list = '',	hierarchical_subject = '',
-						subject = '', keywords = ''):
-		'adds some metadata to the DB'
-		self._logger.info('adding item tags')
-		rowid = self._edit_element('tags', { \
-			'Model': model, \
-			'Software': software, \
-			'DateTimeOriginal': date_time_original, \
-			'CreateDate': create_date, \
-			'ImageWidth': image_width, \
-			'ImageHeight': image_height, \
-			'TagsList': tags_list, \
-			'HierarchicalSubject': hierarchical_subject, \
-			'Subject': subject, \
-			'Keywords': keywords})
-		self._logger.info('item tags successfully added')
-		return rowid
-
 	def _get_rich_file_tags(self, path):
 		'gets the tags of a rich file'
 		self._logger.info('getting tags of rich file %s', path)
@@ -273,6 +253,13 @@ class DbConnector:
 		tags['Keywords'] = tags_list[10]
 		self._logger.info('tags of rich file obtained')
 		return tags
+
+	def _add_tags(self, tags):
+		'adds some metadata to the DB'
+		self._logger.info('adding item tags')
+		rowid = self._edit_element('tags', tags)
+		self._logger.info('item tags successfully added')
+		return rowid
 
 	#
 	# Public methods
@@ -300,11 +287,7 @@ class DbConnector:
 	def add_rich_file(self, path, timestamp, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
 		self._logger.info('adding rich file %s', path)
-		tags_index = self._add_tags(tags['Model'], tags['Software'], 
-										tags['DateTimeOriginal'], tags['CreateDate'], 
-										tags['ImageWidth'], tags['ImageHeight'], 
-										tags['TagsList'], tags['HierarchicalSubject'], 
-										tags['Subject'], tags['Keywords'])
+		tags_index = self._add_tags(tags)
 		self._edit_element('files', { \
 			'path': path, \
 			'timestamp': timestamp, \
@@ -365,6 +348,7 @@ class DbConnector:
 				return None
 			else:
 				raise
+		tags = self._get_rich_file_tags(tags_file)
 		if (content_file == None) and (tags_file != None):
 			content_file = tags_file
 		self._db_curs.execute('SELECT * FROM items_extra_files WHERE name = ?;', [item_name])
@@ -372,7 +356,7 @@ class DbConnector:
 		if extra_files != None:
 			extra_files = extra_files[1].split('|')
 		self._logger.info('item obtained')
-		return (item_name, content_file, tags_file, extra_files)
+		return (item_name, tags, content_file, tags_file, extra_files)
 
 	def get_item_metadata(self, item_name):
 		'returns the tags of the tags file as the item metadata'
