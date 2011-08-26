@@ -50,6 +50,15 @@ SCHEMA_EXTRA_FILES_VIEW = 'CREATE VIEW items_extra_files AS ' + \
 									'group_concat(ef.path,"|") AS extra_files ' + \
 									'FROM simple_items i, files ef, other_files of ' + \
 									'WHERE i.item_id = of.item AND of.file = ef.file_id;'
+SCHEMA_FULL_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
+									'SELECT i.name AS name, ' + \
+									'cf.path AS content_file, ' + \
+									'tf.path AS tags_file ' + \
+									'ief.extra_files AS extra_files ' + \
+									'FROM simple_items i ' + \
+									'LEFT JOIN files cf ON i.content_file = cf.file_id ' + \
+									'LEFT JOIN files tf ON i.tags_file = tf.file_id ' + \
+									'LEFT JOIN items_extra_files ief ON i.name = ief.name;'
 
 # exceptions
 class ApoDbError(ValueError):
@@ -315,7 +324,7 @@ class DbConnector:
 		try:
 			content_file_id = cur.fetchone()[0]
 		except TypeError:
-			raise ApoDbMissingFile(content_file, item_name)
+			raise ApoDbMissingFile(content_file, name)
 		self._edit_element('simple_items', {'content_file': content_file_id}, {'name': name})
 		self._logger.info('item added')
 
@@ -335,40 +344,6 @@ class DbConnector:
 			raise ApoDbMissingFile(tags_file, item_name)
 		self._edit_element('simple_items', {'tags_file': tags_file_id}, {'name': name})
 		self._logger.info('item added')
-
-	def get_item(self, item_name):
-		'returns the specified item'
-		self._logger.info('getting item %s' % item_name)
-		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
-		try:
-			(item_name, content_file, tags_file) = self._db_curs.fetchone()
-		except TypeError, err:
-			if (str(err) == "'NoneType' object is not iterable"):
-				self._logger.warning("item %s doesn't exist yet" % item_name)
-				return None
-			else:
-				raise
-		tags = self._get_rich_file_tags(tags_file)
-		if (content_file == None) and (tags_file != None):
-			content_file = tags_file
-		self._db_curs.execute('SELECT * FROM items_extra_files WHERE name = ?;', [item_name])
-		extra_files = self._db_curs.fetchone()
-		if extra_files != None:
-			extra_files = extra_files[1].split('|')
-		self._logger.info('item obtained')
-		return (item_name, tags, content_file, tags_file, extra_files)
-
-	def get_item_metadata(self, item_name):
-		'returns the tags of the tags file as the item metadata'
-		self._logger.info('getting metadata of item %s' % item_name)
-		self._db_curs.execute('SELECT tags_file FROM items WHERE i.name = ?', [item_name])
-		tags_file = self._db_curs.fetchone()[0]
-		if tags_file_id == None:
-			self._logger.warning("item %s doesn't have any metadata", item_name)
-			return None
-		tags = self._get_rich_file_tags(tags_file)
-		self._logger.info('item metadata obtained')
-		return tags
 
 	def add_extra_file(self, file_path, item_name):
 		'adds a relationship with an extra file to the DB'
@@ -390,3 +365,28 @@ class DbConnector:
 			'file': file_id, \
 			'item': item_id})
 		self._logger.info('item extended with extra file')
+
+	def get_item(self, item_name):
+		'returns the specified item'
+		self._logger.info('getting item %s' % item_name)
+		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
+		try:
+			(item_name, content_file, tags_file) = self._db_curs.fetchone()
+		except TypeError, err:
+			if (str(err) == "'NoneType' object is not iterable"):
+				self._logger.warning("item %s doesn't exist yet" % item_name)
+				return None
+			else:
+				raise
+		if (tags_file != None):
+			tags = self._get_rich_file_tags(tags_file)
+		else:
+			tags = None
+		if (content_file == None) and (tags_file != None):
+			content_file = tags_file
+		self._db_curs.execute('SELECT * FROM items_extra_files WHERE name = ?;', [item_name])
+		extra_files = self._db_curs.fetchone()
+		if extra_files != None:
+			extra_files = extra_files[1].split('|')
+		self._logger.info('item obtained')
+		return (tags, content_file, tags_file, extra_files)
