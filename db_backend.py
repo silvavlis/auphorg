@@ -50,10 +50,10 @@ SCHEMA_EXTRA_FILES_VIEW = 'CREATE VIEW items_extra_files AS ' + \
 									'group_concat(ef.path,"|") AS extra_files ' + \
 									'FROM simple_items i, files ef, other_files of ' + \
 									'WHERE i.item_id = of.item AND of.file = ef.file_id;'
-SCHEMA_FULL_ITEMS_VIEW = 'CREATE VIEW items AS ' + \
+SCHEMA_FULL_ITEMS_VIEW = 'CREATE VIEW full_items AS ' + \
 									'SELECT i.name AS name, ' + \
 									'cf.path AS content_file, ' + \
-									'tf.path AS tags_file ' + \
+									'tf.path AS tags_file, ' + \
 									'ief.extra_files AS extra_files ' + \
 									'FROM simple_items i ' + \
 									'LEFT JOIN files cf ON i.content_file = cf.file_id ' + \
@@ -172,6 +172,7 @@ class DbConnector:
 			self._db_curs.execute(SCHEMA_FILE_INDEX)
 			self._db_curs.execute(SCHEMA_ITEM_INDEX)
 			self._db_curs.execute(SCHEMA_ITEMS_VIEW)
+#			self._db_curs.execute(SCHEMA_FULL_ITEMS_VIEW)
 			self._db_curs.execute(SCHEMA_EXTRA_FILES_VIEW)
 			self._photos_db.commit()
 			self._logger.info('schema added to the DB')

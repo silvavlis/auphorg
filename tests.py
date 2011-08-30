@@ -466,11 +466,14 @@ if __name__ == '__main__':
 		options.test_files_handler = True
 		options.test_tree_scanner = True
 	if options.test_db_backend:
+		print "Run DB backend tests"
 		testDbBackend_suite = unittest.TestLoader().loadTestsFromTestCase(TestDbBackend)
 		unittest.TextTestRunner(verbosity=VERBOSITY).run(testDbBackend_suite)
 	if options.test_files_handler:
+		print "Run file handling tests"
 		testFilesHandler_suite = unittest.TestLoader().loadTestsFromTestCase(TestFilesHandler)
 		unittest.TextTestRunner(verbosity=VERBOSITY).run(testFilesHandler_suite)
 	if options.test_tree_scanner:
+		print "Run directory tree scanning tests"
 		testTreeScanner_suite = unittest.TestLoader().loadTestsFromTestCase(TestTreeScanner)
 		unittest.TextTestRunner(verbosity=VERBOSITY).run(testTreeScanner_suite)
