@@ -35,12 +35,14 @@ class ApoFileUnknown(ApoFileError):
 		self.fileext = os.path.splitext(filename)[1][1:]
 
 	def __str__(self):
-		err_msg = 'file %s cannot be handled, because its extension (%s) not supported is' % \
+		err_msg = 'file %s cannot be handled, because its extension (%s) is not supported' % \
 			(self.filename, self.fileext)
 		self._logger.error = err_msg
 		return err_msg
 
 class FilesHandler:
+	ignore_exts = ('.db', '.strm')
+
 	def __init__(self):
 		self._logger = logging.getLogger('AuPhOrg')
 		self._logger.info('instanciating DB backend')
@@ -53,7 +55,7 @@ class FilesHandler:
 	def _file_checksum(self, path):
 		'calculates the SHA512 checksum of the file'
 		self._logger.info('calculating the checksum of the file %s' % path)
-		cmd = CHECKSUM_TOOL + " -b " + path
+		cmd = CHECKSUM_TOOL + ' -b "' + path + '"'
 		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		lines = output.read().splitlines()
 		self._logger.info('checksum of file calculated')
@@ -194,6 +196,8 @@ class FilesHandler:
 			self._add_image(item_name, path)
 		elif (extension in ('.wav')):
 			self._add_audio(item_name, path)
+		elif (extension in self.ignore_exts):
+			self._logger.info('Ignore file')
 		else:
 			raise ApoFileUnknown(path)
 		self._logger.info('file added')
