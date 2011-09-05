@@ -22,7 +22,7 @@ EXIF_TOOL = "/usr/bin/exiftool"
 EXIFTOOL_REQUEST = EXIF_TOOL + ' -s'
 for tag in TAGS_TO_GET:
 	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
-CHECKSUM_TOOL = "/usr/bin/sha512sum"
+CHECKSUM_TOOL = "/usr/bin/sha1sum"
 
 class ApoFileError(TypeError):
 	def __init__(self):
