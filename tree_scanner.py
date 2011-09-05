@@ -19,4 +19,4 @@ class TreeScanner(list):
 		for filename in filenames:
 			filepath = os.path.join(dir_path, filename)
 			if not (os.path.isdir(filepath) or os.path.islink(filepath)):
-				self._fsh.add_file(filepath)
+				self._fsh.add_file(unicode(filepath, 'utf-8'))
