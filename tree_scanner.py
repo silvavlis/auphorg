@@ -15,13 +15,10 @@ def file_processor(filepath):
 	logger = logging.getLogger('AuPhOrg')
 	logger.info('starting process for file %s' % filepath)
 	fsh = files_handler.FilesHandler()
-	print "adding " + filepath
 	fsh.add_file(unicode(filepath, 'utf-8'))
-	print filepath + " added"
 	lock.acquire()
 	processed.value += 1
 	lock.release()
-	print processed.value
 	logger.info('leaving process for file %s' % filepath)
 
 # scans the given tree and tries to add the found files to the DB
@@ -46,15 +43,15 @@ class TreeScanner():
 		self._logger.info('processing tree %s' % photostree_root)
 		os.path.walk(photostree_root, self._scan_subtree, None)
 		n_files_to_add = len(self._files_to_add)
-		print n_files_to_add
 		lock = multiprocessing.Lock()
 		result = TreeScanner._pool.map_async(file_processor, self._files_to_add)
 		result.wait(10)
 		while not result.ready():
+			percent = 100 * processed.value / n_files_to_add
 			print "%d out of %d ready (%d%%)" % \
-				(processed.value, n_files_to_add, \
-					100 * processed.value / n_files_to_add)
+				(processed.value, n_files_to_add, percent)
 			result.wait(10)
+		self._logger.info('the pool of processes already procesed the tree!')
 
 	def _scan_subtree(self, arg, dir_path, filenames):
 		for filename in filenames:
@@ -76,4 +73,4 @@ if __name__ == '__main__':
 	logger.setLevel(logging.INFO)
 	tree_scanner = TreeScanner()
 	tree_scanner.init_pool()
-	tree_scanner.scan_tree('/home/silvavlis/tmp/test')
+	tree_scanner.scan_tree('/home/silvavlis/Pictures')
