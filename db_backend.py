@@ -148,7 +148,6 @@ class DbConnector:
 		'connects to DB for saving collection'
 		# connect to the DB
 		self._logger = logging.getLogger('AuPhOrg')
-		self._logger.info('connecting to DB %s' % db_path)
 		if db_path == '':
 			# if no DB path given, then use the tests DB
 			if os.path.exists(DB_PATH_TEST):
@@ -156,6 +155,7 @@ class DbConnector:
 				os.remove(DB_PATH_TEST)
 				self._logger.warning('test DB removed')
 			db_path = DB_PATH_TEST
+		self._logger.info('connecting to DB %s' % db_path)
 		self._db_path = db_path
 		self._photos_db = sqlite3.connect(self._db_path)
 		self._db_curs = self._photos_db.cursor()

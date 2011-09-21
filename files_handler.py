@@ -43,10 +43,10 @@ class ApoFileUnknown(ApoFileError):
 class FilesHandler:
 	ignore_exts = ('.db', '.strm')
 
-	def __init__(self):
+	def __init__(self, database_path = ""):
 		self._logger = logging.getLogger('AuPhOrg')
-		self._logger.info('instanciating DB backend')
-		self._db = db_backend.DbConnector()
+		self._logger.info('instanciating DB backend for %s' % database_path)
+		self._db = db_backend.DbConnector(database_path)
 		self._logger.info('DB backend instanciated')
 
 	def __del__(self):
