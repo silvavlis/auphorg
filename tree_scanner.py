@@ -60,7 +60,7 @@ class TreeScanner():
 			percent = 100 * processed.value / n_files_to_add
 			print "%d out of %d ready (%d%%)" % \
 				(processed.value, n_files_to_add, percent)
-			result.wait(100)
+			result.wait(120)
 		self._logger.info('the pool of processes already procesed the tree!')
 
 	def _scan_subtree(self, arg, dir_path, filenames):
