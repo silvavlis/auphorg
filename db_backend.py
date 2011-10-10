@@ -25,6 +25,7 @@ SCHEMA_FILES = 'CREATE TABLE files (' + \
 									'file_id INTEGER PRIMARY KEY ASC, ' + \
 									'path TEXT UNIQUE, ' + \
 									'timestamp TEXT, ' + \
+									'file_size INTEGER, ' + \
 									'file_checksum TEXT, ' + \
 									'content_checksum TEXT, ' + \
 									'tags REFERENCES tags(tags_id));'
@@ -150,21 +151,22 @@ class DbConnector:
 		self._logger = logging.getLogger('AuPhOrg')
 		if db_path == '':
 			# if no DB path given, then use the tests DB
+			self._logger.warning('no DB specified, using the test DB!')
 			if os.path.exists(DB_PATH_TEST):
 				self._logger.warning('test DB already exists in %s, removing it' % DB_PATH_TEST)
 				os.remove(DB_PATH_TEST)
 				self._logger.warning('test DB removed')
 			db_path = DB_PATH_TEST
-		self._logger.info('connecting to DB %s' % db_path)
+		self._logger.debug('connecting to DB %s' % db_path)
 		self._db_path = db_path
 		self._photos_db = sqlite3.connect(self._db_path)
 		self._db_curs = self._photos_db.cursor()
-		self._logger.info('connection to DB established')
+		self._logger.debug('connection to DB established')
 		# if database doesn't have the schema yet, create it
 		self._db_curs.execute("SELECT name FROM sqlite_master WHERE type='table';")
 		tables = self._db_curs.fetchall()
 		if (not (u'files',) in tables) or (not (u'simple_items',) in tables) or (not (u'tags',) in tables):
-			self._logger.info('adding the schema to the DB')
+			self._logger.warning('adding the schema to the DB')
 			self._db_curs.execute(SCHEMA_TAGS)
 			self._db_curs.execute(SCHEMA_FILES)
 			self._db_curs.execute(SCHEMA_ITEMS)
@@ -175,17 +177,17 @@ class DbConnector:
 #			self._db_curs.execute(SCHEMA_FULL_ITEMS_VIEW)
 			self._db_curs.execute(SCHEMA_EXTRA_FILES_VIEW)
 			self._photos_db.commit()
-			self._logger.info('schema added to the DB')
+			self._logger.debug('schema added to the DB')
 
 	def __del__(self):
 		'closes the connection to the DB before destroying the object'
-		self._logger.info('closing connection with DB')
+		self._logger.debug('closing connection with DB')
 		self._photos_db.close()
-		self._logger.info('connection with DB closed')
+		self._logger.debug('connection with DB closed')
 
 	def _insert_query(self, table, values):
 		'generates an SQL query for inserting "values" into "table"'
-		self._logger.info('adding an entry to table %s with values %s' % (table, str(values)))
+		self._logger.debug('adding an entry to table %s with values %s' % (table, str(values)))
 		field_names = ''
 		field_placeholders = ''
 		query_values = []
@@ -197,12 +199,12 @@ class DbConnector:
 		field_placeholders = field_placeholders[:-2]
 		sql_query = 'INSERT INTO %s (%s) VALUES (%s);' % \
 			(table, field_names, field_placeholders)
-		self._logger.info('entry to table %s successfully added' % table)
+		self._logger.debug('entry to table %s successfully added' % table)
 		return (sql_query, query_values)
 
 	def _update_query(self, table, values, element_filters):
 		'generates an SQL query for changing the "values" from "table" that match "element_filters"'
-		self._logger.info('updating entry of table %s that matches filter %s with values %s' \
+		self._logger.debug('updating entry of table %s that matches filter %s with values %s' \
 			% (table, str(element_filters), str(values)))
 		field_names = ''
 		field_placeholders = ''
@@ -219,12 +221,12 @@ class DbConnector:
 		field_names = field_names[:-2]
 		sql_query = 'UPDATE %s SET %s WHERE %s;' % \
 			(table, field_names, filter_names)
-		self._logger.info('entry to table %s successfully updated' % table)
+		self._logger.debug('entry to table %s successfully updated' % table)
 		return (sql_query, query_values)
 
 	def _edit_element(self, table, values, element_filters = None):	
 		'edits the specified "values" from "table", explicitly reporting duplications'
-		self._logger.info('editing entry of table %s' % table)
+		self._logger.debug('editing entry of table %s' % table)
 		if (element_filters == None):
 			(sql_query, query_values) = self._insert_query(table, values)
 		else:
@@ -240,12 +242,12 @@ class DbConnector:
 				err_field = dup_field.group(1)
 				item_type = table[:-1]
 				raise ApoDbDupUniq(item_type, err_field, values[err_field])
-		self._logger.info('done editing entry')
+		self._logger.debug('done editing entry')
 		return self._db_curs.lastrowid
 
 	def _get_rich_file_tags(self, path):
 		'gets the tags of a rich file'
-		self._logger.info('getting tags of rich file %s', path)
+		self._logger.debug('getting tags of rich file %s', path)
 		self._db_curs.execute('SELECT t.* FROM tags t, files f WHERE t.tags_id = f.tags AND path = ?;', [path])
 		tags_list = self._db_curs.fetchone()
 		if tags_list == None:
@@ -261,60 +263,63 @@ class DbConnector:
 		tags['HierarchicalSubject'] = tags_list[8]
 		tags['Subject'] = tags_list[9]
 		tags['Keywords'] = tags_list[10]
-		self._logger.info('tags of rich file obtained')
+		self._logger.debug('tags of rich file obtained')
 		return tags
 
 	def _add_tags(self, tags):
 		'adds some metadata to the DB'
-		self._logger.info('adding item tags')
+		self._logger.debug('adding item tags')
 		rowid = self._edit_element('tags', tags)
-		self._logger.info('item tags successfully added')
+		self._logger.debug('item tags successfully added')
 		return rowid
 
 	#
 	# Public methods
 	#
 
-	def add_non_raw_file(self, path, timestamp, file_checksum, content_checksum):
+	def add_non_raw_file(self, path, timestamp, file_size, file_checksum, content_checksum):
 		'adds a non raw file without metadata to the DB'
-		self._logger.info('adding non RAW file %s', path)
+		self._logger.debug('adding non RAW file %s', path)
 		self._edit_element('files', {\
 			'path': path, \
 			'timestamp': timestamp, \
+			'file_size': file_size, \
 			'file_checksum': file_checksum, \
 			'content_checksum': content_checksum})
-		self._logger.info('non RAW file added')
+		self._logger.debug('non RAW file added')
 
-	def add_raw_file(self, path, timestamp, file_checksum):
+	def add_raw_file(self, path, timestamp, file_size, file_checksum):
 		'adds a raw file without metadata to the DB'
-		self._logger.info('adding RAW file %s', path)
+		self._logger.debug('adding RAW file %s', path)
 		self._edit_element('files', {\
 			'path': path, \
 			'timestamp': timestamp, \
+			'file_size': file_size, \
 			'file_checksum': file_checksum})
-		self._logger.info('RAW file added')
+		self._logger.debug('RAW file added')
 
-	def add_rich_file(self, path, timestamp, file_checksum, image_checksum, tags):
+	def add_rich_file(self, path, timestamp, file_size, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'
-		self._logger.info('adding rich file %s', path)
+		self._logger.debug('adding rich file %s', path)
 		tags_index = self._add_tags(tags)
 		self._edit_element('files', { \
 			'path': path, \
 			'timestamp': timestamp, \
+			'file_size': file_size, \
 			'file_checksum': file_checksum, \
 			'content_checksum': image_checksum, \
 			'tags': tags_index})
-		self._logger.info('rich file added')
+		self._logger.debug('rich file added')
 
 	def add_item(self, name):
 		'adds a multimedia item to the DB'
-		self._logger.info('adding item %s' % name)
+		self._logger.debug('adding item %s' % name)
 		self._edit_element('simple_items', {'name': name})
-		self._logger.info('item added')
+		self._logger.debug('item added')
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
-		self._logger.info('adding to item %s the file %s as its content file' % (name, content_file))
+		self._logger.debug('adding to item %s the file %s as its content file' % (name, content_file))
 		# check that the item doesn't contain any content file yet
 		(_, cf, tf, _) = self.get_item(name)
 		if (cf != None) and (cf != tf):
@@ -327,11 +332,11 @@ class DbConnector:
 		except TypeError:
 			raise ApoDbMissingFile(content_file, name)
 		self._edit_element('simple_items', {'content_file': content_file_id}, {'name': name})
-		self._logger.info('item added')
+		self._logger.debug('item added')
 
 	def add_item_tags(self, name, tags_file):
 		'adds a tags file to a multimedia item into the DB'
-		self._logger.info('adding to item %s the file %s as its metadata file' % (name, tags_file))
+		self._logger.debug('adding to item %s the file %s as its metadata file' % (name, tags_file))
 		# check that the item doesn't contain any tags file yet
 		(_, cf, tf, _) = self.get_item(name)
 		if tf != None:
@@ -344,11 +349,11 @@ class DbConnector:
 		except TypeError:
 			raise ApoDbMissingFile(tags_file, item_name)
 		self._edit_element('simple_items', {'tags_file': tags_file_id}, {'name': name})
-		self._logger.info('item added')
+		self._logger.debug('item added')
 
 	def add_extra_file(self, file_path, item_name):
 		'adds a relationship with an extra file to the DB'
-		self._logger.info('extending item %s by adding the extra file %s' % (item_name, file_path))
+		self._logger.debug('extending item %s by adding the extra file %s' % (item_name, file_path))
 		cur = self._db_curs
 		cur.execute('SELECT file_id FROM files WHERE path = "%s";' % file_path)
 		try:
@@ -365,11 +370,11 @@ class DbConnector:
 		self._edit_element('other_files', { \
 			'file': file_id, \
 			'item': item_id})
-		self._logger.info('item extended with extra file')
+		self._logger.debug('item extended with extra file')
 
 	def get_item(self, item_name):
 		'returns the specified item'
-		self._logger.info('getting item %s' % item_name)
+		self._logger.debug('getting item %s' % item_name)
 		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
 		try:
 			(item_name, content_file, tags_file) = self._db_curs.fetchone()
@@ -389,5 +394,5 @@ class DbConnector:
 		extra_files = self._db_curs.fetchone()
 		if extra_files != None:
 			extra_files = extra_files[1].split('|')
-		self._logger.info('item obtained')
+		self._logger.debug('item obtained')
 		return (tags, content_file, tags_file, extra_files)
