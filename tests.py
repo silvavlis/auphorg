@@ -7,6 +7,7 @@ import os
 import shutil
 import logging
 import optparse
+import subprocess
 
 import db_backend
 import files_handler
@@ -27,11 +28,13 @@ class TestDbBackend(unittest.TestCase):
 				}
 	test_fpoor_1 = {'path': u'/this/is/a/path_1',
 						'timestamp': u'12/32/3423 14:74:12',
+						'file_size': 1234,
 						'file_checksum': u'f1l3ch3cksum1',
 						'content_checksum': u'c0nt3ntch3cksum1'
 						}
 	test_frich_1 = {'path': u'/this/is/a/path_2',
 						'timestamp': u'12/32/3423 14:74:12',
+						'file_size': 1234,
 						'file_checksum': u'f1l3ch3cksum2',
 						'content_checksum': u'c0nt3ntch3cksum2',
 						'tags': test_tags
@@ -42,11 +45,13 @@ class TestDbBackend(unittest.TestCase):
 						}
 	test_fpoor_2 = {'path': u'/this/is/a/path_3',
 						'timestamp': u'12/32/3423 14:74:12',
+						'file_size': 1234,
 						'file_checksum': u'f1l3ch3cksum3',
 						'content_checksum': u'c0nt3ntch3cksum3'
 						}
 	test_frich_2 = {'path': u'/this/is/a/path_5',
 						'timestamp': u'12/32/3423 14:74:12',
+						'file_size': 1234,
 						'file_checksum': u'f1l3ch3cksum5',
 						'content_checksum': u'c0nt3ntch3cksum5',
 						'tags': test_tags
@@ -61,6 +66,7 @@ class TestDbBackend(unittest.TestCase):
 						}
 	test_fpoor_3 = {'path': u'/this/is/a/path_4',
 						'timestamp': u'12/32/3423 14:74:12',
+						'file_size': 1234,
 						'file_checksum': u'f1l3ch3cksum4',
 						'content_checksum': u'c0nt3ntch3cksum4'
 						}
@@ -104,7 +110,7 @@ class TestDbBackend(unittest.TestCase):
 		# test the addition of a poor image
 		test_file = self.test_fpoor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		for tag_name in test_file.keys():
 			cur.execute("SELECT " + tag_name + " FROM files WHERE path = ?;", (test_file['path'],))
 			tag = cur.fetchone()
@@ -112,10 +118,10 @@ class TestDbBackend(unittest.TestCase):
 		# test the addition of an existing file 
 		test_file = self.test_fpoor_1
 		self.assertRaises(db_backend.ApoDbDupUniq, self._db.add_non_raw_file, test_file['path'], \
-			test_file['timestamp'], test_file['file_checksum'], test_file['content_checksum'])
+			test_file['timestamp'], test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		# test the addition of a rich file
 		test_file = self.test_frich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], 
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_size'],
 			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		for file_info_item in test_file.keys():
 			if file_info_item != 'tags':
@@ -149,7 +155,7 @@ class TestDbBackend(unittest.TestCase):
 		# test the addition of a content file to the item
 		test_file = self.test_fpoor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
 		cur.execute("SELECT path FROM files, simple_items WHERE file_id = content_file;")
 		value = cur.fetchone()[0]
@@ -157,12 +163,12 @@ class TestDbBackend(unittest.TestCase):
 		# test the addition of a second content file to the item
 		test_file = self.test_fpoor_2
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self.assertRaises(db_backend.ApoDbContentExists, self._db.add_item_content, \
 			test_item['name'], test_item['content_file'])
 		# test the addition of a tags file to the item
 		test_file = self.test_frich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], 
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_size'], 
 			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		cur.execute("SELECT tags_file FROM simple_items;")
@@ -172,7 +178,7 @@ class TestDbBackend(unittest.TestCase):
 		self.assertTrue(value == test_item['tags_file'])
 		# test the addition of a second tags file to the item
 		test_file = self.test_frich_2
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], 
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_size'], 
 			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self.assertRaises(db_backend.ApoDbTagsExists, self._db.add_item_tags, \
 			test_item['name'], test_item['tags_file'])
@@ -188,12 +194,12 @@ class TestDbBackend(unittest.TestCase):
 		self._db.add_item(test_item['name'])
 		test_file = self.test_fpoor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
 		# test the addition of an extra file to the item
 		test_file = self.test_fpoor_2
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		#check that extra file properly added
 		cur.execute("SELECT extra_files FROM items_extra_files WHERE name = '%s';" % test_item['name'])
@@ -213,7 +219,7 @@ class TestDbBackend(unittest.TestCase):
 		self._db.add_item(test_item['name'])
 		test_file = self.test_fpoor_2
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
 		(tags, content_file, tags_file, extra_files) = self._db.get_item(test_item['name'])
 		self.assertEquals(content_file, test_item['content_file'])
@@ -226,7 +232,7 @@ class TestDbBackend(unittest.TestCase):
 		test_item = self.test_item_3
 		self._db.add_item(test_item['name'])
 		test_file = self.test_frich_2
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], \
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_size'], \
 			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		(tags, content_file, tags_file, extra_files) = self._db.get_item(test_item['name'])
@@ -241,19 +247,19 @@ class TestDbBackend(unittest.TestCase):
 		self._db.add_item(test_item['name'])
 		test_file = self.test_fpoor_1
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_item_content(test_item['name'], test_item['content_file'])
 		test_file = self.test_frich_1
-		self._db.add_rich_file(test_file['path'], test_file['timestamp'], \
+		self._db.add_rich_file(test_file['path'], test_file['timestamp'], test_file['file_size'], \
 			test_file['file_checksum'], test_file['content_checksum'], test_file['tags'])
 		self._db.add_item_tags(test_item['name'], test_item['tags_file'])
 		test_file = self.test_fpoor_2
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		test_file = self.test_fpoor_3
 		self._db.add_non_raw_file(test_file['path'], test_file['timestamp'], \
-			test_file['file_checksum'], test_file['content_checksum'])
+			test_file['file_size'], test_file['file_checksum'], test_file['content_checksum'])
 		self._db.add_extra_file(test_file['path'], test_item['name'])
 		(tags, content_file, tags_file, extra_files) = self._db.get_item(test_item['name'])
 		self.assertTrue(content_file == test_item['content_file'])
@@ -266,6 +272,12 @@ class TestFilesHandler(unittest.TestCase):
 	_raw_file_path = "./test.raw"
 	_video_file_path = "./test.avi"
 	_audio_file_path = "./test.wav"
+
+	def _checksum(self, path):
+		cmd = files_handler.CHECKSUM_TOOL + ' -b "' + path + '"'
+		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+		lines = output.read().splitlines()
+		return lines[0].split(' ')[0]
 
 	def setUp(self):
 		# instanciate a FileHandler object
@@ -289,9 +301,7 @@ class TestFilesHandler(unittest.TestCase):
 		cur.execute("SELECT file_checksum, content_checksum FROM files ' + \
 					'WHERE path = ?;", [path])
 		(file_checksum, content_checksum)= cur.fetchone()
-		FILE_CHECKSUM = 'b6997bddbfbf70f903e664dfef363a63ce4e464c494480' + \
-			'a79c5f601485e6e481389e7da900a980a5bea7aca0b6ab040853ffababcd8' + \
-			'5aca8360dccd514a1d676'
+		FILE_CHECKSUM = self._checksum(path)
 		self.assertTrue(file_checksum == FILE_CHECKSUM)
 		CONTENT_CHECKSUM = '562fbb377e28a0577356a35ad1b17dbdbdccbdfb74df810c2' + \
 			'e156cecd27613e209675c404a1eac05c0e2dbabedc92abf77f3267f1d14c7d2c' + \
@@ -353,9 +363,7 @@ class TestFilesHandler(unittest.TestCase):
 		cur.execute("SELECT file_checksum, content_checksum FROM files ' + \
 					'WHERE path = ?;", [path])
 		(file_checksum, content_checksum)= cur.fetchone()
-		FILE_CHECKSUM = '0ec5c06bb958b6ed4756f75d731e7db0eb5fc9c7793128' + \
-			'42b84cc43e75a18f5ab79767db017cdfe03e32d5bac2269261c3d53f19' + \
-			'07012c641b8400dfaba10ebf'
+		FILE_CHECKSUM = self._checksum(path)
 		self.assertTrue(file_checksum == FILE_CHECKSUM)
 		CONTENT_CHECKSUM = '2f7361b7d0ad9f04a1739eb57c557431f68e9f63f7f' + \
 			'4ac7343b22a0212d824152c109277b6a5f23a5ca47d8a598c9ba5b3820' + \
@@ -374,9 +382,7 @@ class TestFilesHandler(unittest.TestCase):
 		cur.execute("SELECT file_checksum FROM files ' + \
 					'WHERE path = ?;", [path])
 		(file_checksum,)= cur.fetchone()
-		FILE_CHECKSUM = 'bb5cff62ca1f7afd7d259aa795225b011560ee8fb3fa18d122d2' + \
-			'ccbea7fe9f37ee500c00941b96911a41eb341a9c14d168c23dcde76911204ed8' + \
-			'1f1c2f215780'
+		FILE_CHECKSUM = self._checksum(path)
 		self.assertTrue(file_checksum == FILE_CHECKSUM)
 
 	def test_add_video(self):
@@ -391,9 +397,7 @@ class TestFilesHandler(unittest.TestCase):
 		cur.execute("SELECT file_checksum, content_checksum FROM files ' + \
 					'WHERE path = ?;", [path])
 		(file_checksum, content_checksum)= cur.fetchone()
-		FILE_CHECKSUM = 'f5df0c2e9700f1a959632864681ee0f22e4e4f3b0de99a29f259' + \
-			'52bc2e128bb17b9b98f040c02320a3770701d762d0b179bfe2d1089cff4a9030' + \
-			'84be08c18297'
+		FILE_CHECKSUM = self._checksum(path)
 		self.assertTrue(file_checksum == FILE_CHECKSUM)
 		CONTENT_CHECKSUM = 'a052484faa9a42f7e7c4aa5af6d4a76fd79a6dc167d322926' + \
 			'06ed10a50a0adc35aa2c73ffad97389b387d9bca7da3239b14817ffd5b14789a' + \
@@ -412,9 +416,7 @@ class TestFilesHandler(unittest.TestCase):
 		cur.execute("SELECT file_checksum, content_checksum FROM files ' + \
 					'WHERE path = ?;", [path])
 		(file_checksum, content_checksum)= cur.fetchone()
-		FILE_CHECKSUM = '720b5044c891d29212b4e8b0289d2b5dcec33a040208be7e3cbe' + \
-			'1c331a2a403a1041d94d13f68d9b0961f4721619a250e50628bf9ae26220ff72' + \
-			'05f10e5a871e'
+		FILE_CHECKSUM = self._checksum(path)
 		self.assertTrue(file_checksum == FILE_CHECKSUM)
 		CONTENT_CHECKSUM = '9a0a83575d79c38052a07d50b809753fab5ca31680de2bfa2' + \
 			'67ead08548f15f82e4e7b2695874c1b7dc363427c7379636f7d6b3864a65d382' + \
@@ -439,7 +441,8 @@ class TestTreeScanner(unittest.TestCase):
 		shutil.rmtree('./testTree')
 
 	def testTreeScanned(self):
-		tree_scanner.TreeScanner('./testTree')
+		output = subprocess.Popen('./tree_scanner.py -v 4 -r ./testTree', shell=True, stdout = subprocess.PIPE).stdout
+		lines = output.read().splitlines()
 
 if __name__ == '__main__':
 	VERBOSITY=1
