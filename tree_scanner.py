@@ -19,7 +19,9 @@ def init_process(inherited_lock, inherited_processed):
 def file_processor(filepath):
 	logger = logging.getLogger('AuPhOrg')
 	logger.info('starting process for file %s' % filepath)
+	lock.acquire()
 	fsh = files_handler.FilesHandler(TreeScanner.db_path)
+	lock.release()
 	fsh.add_file(unicode(filepath, 'utf-8'))
 	lock.acquire()
 	processed.value += 1
@@ -38,12 +40,11 @@ class TreeScanner():
 		self._logger.info('done processing tree')
 
 	def init_pool(self, database_path = ""):
-		if TreeScanner.db_path == "":
-			TreeScanner.db_path = database_path
+		TreeScanner.db_path = database_path
 		self.n_cpus = multiprocessing.cpu_count()
 		if TreeScanner._pool != None:
 			raise RuntimeError
-		self._logger.info('starting the pool of processes')
+		self._logger.info('starting a pool of %d processes' % self.n_cpus)
 		TreeScanner._pool = multiprocessing.Pool(self.n_cpus)
 		self._logger.info('pool of processes started')
 
@@ -70,6 +71,15 @@ class TreeScanner():
 				self._files_to_add.append(filepath)
 
 if __name__ == '__main__':
+	# initialize the logging infrastructure
+	log_fh = logging.FileHandler('./auphorg.log')
+	log_so = logging.StreamHandler()
+	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
+	log_fh.setFormatter(formatter)
+	log_so.setFormatter(formatter)
+	logger = logging.getLogger('AuPhOrg')
+	logger.addHandler(log_fh)
+#	logger.addHandler(log_so)
 	# get the arguments
 	parser = optparse.OptionParser()
 	parser.add_option('-r', '--root', dest='tree_root', metavar='ROOT', \
@@ -82,30 +92,22 @@ if __name__ == '__main__':
 	if options.tree_root == None:
 		print "The root directory of the tree to be scanned is required!"
 		sys.exit()
-	if options.verbosity == None:
-		verbosity = logging.ERROR
-	elif options.verbosity == 0:
+	if options.verbosity == '0':
 		verbosity = logging.CRITICAL
-	elif options.verbosity == 1:
+	elif options.verbosity == '1':
 		verbosity = logging.ERROR
-	elif options.verbosity == 2:
+	elif options.verbosity == '2':
 		verbosity = logging.WARNING
-	elif options.verbosity == 3:
+	elif options.verbosity == '3':
 		verbosity = logging.INFO
-	elif options.verbosity == 4:
+	elif options.verbosity == '4':
 		verbosity = logging.DEBUG
+	else:
+		verbosity = logging.ERROR
+	logger.setLevel(verbosity)
 	if options.db_path == None:
-		db_path = ""
-	# initialize the logging infrastructure
-	log_fh = logging.FileHandler('./auphorg.log')
-	log_so = logging.StreamHandler()
-	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
-	log_fh.setFormatter(formatter)
-	log_so.setFormatter(formatter)
-	logger = logging.getLogger('AuPhOrg')
-	logger.addHandler(log_fh)
-#	logger.addHandler(log_so)
-	logger.setLevel(logging.INFO)
+		logger.warning('no DB specified in the command line')
+		options.db_path = ""
 	# initialize the variables required for keeping track of the number of processed files
 	lock = multiprocessing.Lock()
 	processed = multiprocessing.Value('i', 0)
