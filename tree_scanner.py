@@ -12,11 +12,9 @@ import optparse
 lock = None
 processed = None
 
-def init_process(inherited_lock, inherited_processed):
-	lock = inherited_lock
-	processed = inherited_processed
-
+# processes a single file
 def file_processor(filepath):
+	'process the given file'
 	logger = logging.getLogger('AuPhOrg')
 	logger.info('starting process for file %s' % filepath)
 	lock.acquire()
@@ -54,7 +52,7 @@ class TreeScanner():
 		n_files_to_add = len(self._files_to_add)
 		self._logger.info('tree analyzed (%s files to process)' % n_files_to_add)
 		self._logger.info('processing tree')
-		lock = multiprocessing.Lock()
+		#lock = multiprocessing.Lock()
 		result = TreeScanner._pool.map_async(file_processor, self._files_to_add)
 		result.wait(10)
 		while not result.ready():
@@ -74,7 +72,7 @@ if __name__ == '__main__':
 	# initialize the logging infrastructure
 	log_fh = logging.FileHandler('./auphorg.log')
 	log_so = logging.StreamHandler()
-	formatter = logging.Formatter('%(asctime)s %(levelname)s %(module)s: %(message)s')
+	formatter = logging.Formatter('%(asctime)s %(levelname)s [%(processName)s]%(module)s: %(message)s')
 	log_fh.setFormatter(formatter)
 	log_so.setFormatter(formatter)
 	logger = logging.getLogger('AuPhOrg')

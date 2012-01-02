@@ -44,10 +44,11 @@ class FilesHandler:
 	ignore_exts = ('.db', '.strm')
 
 	def __init__(self, database_path = ""):
-		if database_path == '':
-			self._logger.warning('')
 		self._logger = logging.getLogger('AuPhOrg')
-		self._logger.debug('instanciating DB backend for %s' % database_path)
+		if database_path == '':
+			self._logger.warning('no DB specified in the command line')
+		else:
+			self._logger.debug('instanciating the DB backend for %s' % database_path)
 		self._db = db_backend.DbConnector(database_path)
 		self._logger.debug('DB backend instanciated')
 

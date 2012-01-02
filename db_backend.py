@@ -167,6 +167,7 @@ class DbConnector:
 		tables = self._db_curs.fetchall()
 		if (not (u'files',) in tables) or (not (u'simple_items',) in tables) or (not (u'tags',) in tables):
 			self._logger.warning('adding the schema to the DB')
+			self._logger.debug('DB tables: %s' % tables)
 			self._db_curs.execute(SCHEMA_TAGS)
 			self._db_curs.execute(SCHEMA_FILES)
 			self._db_curs.execute(SCHEMA_ITEMS)
