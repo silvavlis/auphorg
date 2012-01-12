@@ -46,7 +46,7 @@ class FilesHandler:
 	def __init__(self, database_path = ""):
 		self._logger = logging.getLogger('AuPhOrg')
 		if database_path == '':
-			self._logger.warning('no DB specified in the command line')
+			self._logger.debug('no DB specified in the command line')
 		else:
 			self._logger.debug('instanciating the DB backend for %s' % database_path)
 		self._db = db_backend.DbConnector(database_path)
@@ -179,7 +179,7 @@ class FilesHandler:
 
 	def add_file(self, path):
 		'adds the file of the given path to the DB'
-		self._logger.info('adding the file %s' % path)
+		self._logger.debug('adding the file %s' % path)
 		# test that path is file
 		if not os.path.isfile(path):
 			raise RuntimeError, "path isn't a file!"
@@ -190,7 +190,7 @@ class FilesHandler:
 		item = self._db.get_item(item_name)
 		# if item doesn't exist, create a new item for the file
 		if (item == None):
-			self._logger.info("adding the item %s, because it didn't existed yet" % item_name)
+			self._logger.debug("adding the item %s, because it didn't existed yet" % item_name)
 			self._db.add_item(item_name)
 			self._logger.debug("item added for the file %s" % path)
 		# if JPEG file

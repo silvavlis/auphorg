@@ -151,11 +151,7 @@ class DbConnector:
 		self._logger = logging.getLogger('AuPhOrg')
 		if db_path == '':
 			# if no DB path given, then use the tests DB
-			self._logger.warning('no DB specified, using the test DB!')
-			if os.path.exists(DB_PATH_TEST):
-				self._logger.warning('test DB already exists in %s, removing it' % DB_PATH_TEST)
-				os.remove(DB_PATH_TEST)
-				self._logger.warning('test DB removed')
+			self._logger.debug('no DB specified, using the test DB!')
 			db_path = DB_PATH_TEST
 		self._logger.debug('connecting to DB %s' % db_path)
 		self._db_path = db_path
@@ -166,7 +162,7 @@ class DbConnector:
 		self._db_curs.execute("SELECT name FROM sqlite_master WHERE type='table';")
 		tables = self._db_curs.fetchall()
 		if (not (u'files',) in tables) or (not (u'simple_items',) in tables) or (not (u'tags',) in tables):
-			self._logger.warning('adding the schema to the DB')
+			self._logger.debug('adding the schema to the DB')
 			self._logger.debug('DB tables: %s' % tables)
 			self._db_curs.execute(SCHEMA_TAGS)
 			self._db_curs.execute(SCHEMA_FILES)
@@ -381,7 +377,7 @@ class DbConnector:
 			(item_name, content_file, tags_file) = self._db_curs.fetchone()
 		except TypeError, err:
 			if (str(err) == "'NoneType' object is not iterable"):
-				self._logger.warning("item %s doesn't exist yet" % item_name)
+				self._logger.debug("item %s doesn't exist yet" % item_name)
 				return None
 			else:
 				raise
