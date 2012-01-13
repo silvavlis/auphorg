@@ -16,7 +16,6 @@ processed = None
 def file_processor(filepath):
 	'process the given file'
 	logger_file = logging.getLogger('AuPhOrg')
-	logger_output = logging.getLogger('StdOutput')
 	logger_file.debug('adding file %s' % filepath)
 	lock.acquire()
 	fsh = files_handler.FilesHandler(TreeScanner.db_path)
@@ -88,6 +87,7 @@ def config_logger(log_handler, log_format, logger_name):
 
 # parse the command line arguments
 def parse_args():
+	'parses the arguments to get the verbosity, the tree root and the DB path'
 	parser = optparse.OptionParser()
 	parser.add_option('-r', '--root', dest='tree_root', metavar='ROOT', \
 		help='scan the tree recursively starting from ROOT')
@@ -132,34 +132,7 @@ if __name__ == '__main__':
 	logger_file = config_logger(log_file, log_format, 'AuPhOrg')
 	log_format = '%(asctime)s > %(message)s'
 	logger_output = config_logger(log_output, log_format, 'StdOutput')
-	# get the arguments
-#	parser = optparse.OptionParser()
-#	parser.add_option('-r', '--root', dest='tree_root', metavar='ROOT', \
-#		help='scan the tree recursively starting from ROOT')
-#	parser.add_option('-v', '--verbosity', dest='verbosity', metavar='VERBOSITY_LEVEL', \
-#		help='set the verbosity level to VERBOSITY_LEVEL')
-#	parser.add_option('-d', '--db', dest='db_path', metavar='DATABASE_PATH', \
-#		help='use the database that can be found in DATABASE_PATH or create it new there')
-#	(options, args) = parser.parse_args()
-#	if options.tree_root == None:
-#		logger_file.error('The root directory of the tree to be scanned is required!')
-#		sys.exit()
-#	if options.verbosity == '0':
-#		verbosity = logging.CRITICAL
-#	elif options.verbosity == '1':
-#		verbosity = logging.ERROR
-#	elif options.verbosity == '2':
-#		verbosity = logging.WARNING
-#	elif options.verbosity == '3':
-#		verbosity = logging.INFO
-#	elif options.verbosity == '4':
-#		verbosity = logging.DEBUG
-#	else:
-#		verbosity = logging.ERROR
-#	logger_file.setLevel(verbosity)
-#	if options.db_path == None:
-#		logger_file.info('no DB specified in the command line, the testing DB will be used')
-#		options.db_path = ""
+	# parse the arguments
 	(tree_root, db_path) = parse_args()
 	# initialize the variables required for keeping track of the number of processed files
 	lock = multiprocessing.Lock()
@@ -172,5 +145,3 @@ if __name__ == '__main__':
 	tree_scanner = TreeScanner()
 	tree_scanner.init_pool(db_path)
 	tree_scanner.scan_tree(tree_root)
-#	tree_scanner.init_pool(options.db_path)
-#	tree_scanner.scan_tree(options.tree_root)
