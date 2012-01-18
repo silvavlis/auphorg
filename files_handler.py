@@ -97,6 +97,28 @@ class FilesHandler:
 			logger_file.error('Error gettig image from file %s: %s' % (path, str(err)))
 			logger_output.error('Error gettig image from file %s: %s' % (path, str(err)))
 
+	def _video_checksum(self, path):
+		'calculates the checksum of a video, using ffmpeg and md5sum'
+		logger_file.debug('calculating the checksum of the video contained in file %s' % path)
+		cmd = '/usr/bin/ffmpeg -i "' + path + '" -f avi - 2> /dev/null | /usr/bin/sha512sum -b'
+		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+		result = output.read().splitlines()[0]
+		logger_file.debug('checksum of video calculated')
+		return result.split(' ')[0]
+
+	def _wav_checksum(self, path):
+		'calculates the checksum of a wave file'
+		logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
+		try:
+			wav = wave.open(path, 'rb')
+			cksm = hashlib.sha512()
+			cksm.update(wav.readframes(wav.getnframes()))
+			logger_file.debug('checksum of audio calculated')
+			return cksm.hexdigest()
+		except Exception, err:
+			logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+			logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+
 	def _add_jpeg(self, item_name, path):
 		'adds a JPEG file to the DB'
 		logger_file.debug('adding the JPEG file %s to the item %s' % (path, item_name))
@@ -131,28 +153,6 @@ class FilesHandler:
 		self._db.add_poor_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
 		logger_file.debug('%s file added to item' % item_type)
-
-	def _video_checksum(self, path):
-		'calculates the checksum of a video, using ffmpeg and md5sum'
-		logger_file.debug('calculating the checksum of the video contained in file %s' % path)
-		cmd = '/usr/bin/ffmpeg -i "' + path + '" -f avi - 2> /dev/null | /usr/bin/sha512sum -b'
-		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
-		result = output.read().splitlines()[0]
-		logger_file.debug('checksum of video calculated')
-		return result.split(' ')[0]
-
-	def _wav_checksum(self, path):
-		'calculates the checksum of a wave file'
-		logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
-		try:
-			wav = wave.open(path, 'rb')
-			cksm = hashlib.sha512()
-			cksm.update(wav.readframes(wav.getnframes()))
-			logger_file.debug('checksum of audio calculated')
-			return cksm.hexdigest()
-		except Exception, err:
-			logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
-			logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
 
 	def is_older(self, path):
 		pass
