@@ -196,15 +196,9 @@ class FilesHandler:
 		# get file extension to find out type of file
 		(item_name, extension) = os.path.splitext(path)
 		extension = extension.lower()
-		#TODO: don't check if the item exists, simply try to add the file to the item and create it if required
-		# check if the item already exists
-		item = self._db.get_item(item_name)
-		# if item doesn't exist, create a new item for the file
-		if (item == None):
-			logger_file.debug("adding the item %s, because it didn't existed yet" % item_name)
-			self._db.add_item(item_name)
-			logger_file.debug("item added for the file %s" % path)
-		# if JPEG file
+		# create a new item for the file (it does nothing if it already exists)
+		self._db.add_item(item_name, force=False)
+		# add the file to the corresponding item
 		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 			self._add_jpeg(item_name, path)
 		elif (extension in ('.avi', '.mov', '.wmv')):

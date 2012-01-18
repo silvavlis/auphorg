@@ -104,6 +104,16 @@ class ApoDbMissingTags(ApoDbError):
 		logger_file.error(err_msg)
 		return err_msg
 
+class ApoDbItemExists(ApoDbError):
+	def __init__(self, item_name):
+		super(ApoDbItemExists, self).__init__()
+		self.item_name = item_name
+
+	def __str__(self):
+		err_msg = 'trying to create the already existing item "%s"!' % (self.item_name)
+		logger_file.error(err_msg)
+		return err_msg
+
 class ApoDbContentExists(ApoDbError):
 	def __init__(self, content_file, item_name):
 		super(ApoDbContentExists, self).__init__()
@@ -309,11 +319,22 @@ class DbConnector:
 			'tags': tags_index})
 		logger_file.debug('rich file added')
 
-	def add_item(self, name):
+	def add_item(self, name, force):
 		'adds a multimedia item to the DB'
 		logger_file.debug('adding item %s' % name)
-		self._edit_element('simple_items', {'name': name})
-		logger_file.debug('item added')
+		# check if the item already exists
+		self._db_curs.execute('SELECT name FROM items WHERE name = ?;', [name])
+		result = self._db_curs.fetchone()
+		if result == None:
+			# if item doesn't exist yet, add it
+			self._edit_element('simple_items', {'name': name})
+			logger_file.debug('item added')
+		else:
+			# if item already exists
+			if force == True:
+				raise ApoDbItemExists(name)
+			else:
+				logger_file.debug('item already exists, not adding it')
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
