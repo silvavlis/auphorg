@@ -12,10 +12,12 @@ import optparse
 lock = None
 processed = None
 
+logger_file = logging.getLogger('AuPhOrg')
+logger_output = logging.getLogger('StdOutput')
+
 # processes a single file
 def file_processor(filepath):
 	'process the given file'
-	logger_file = logging.getLogger('AuPhOrg')
 	logger_file.debug('adding file %s' % filepath)
 	lock.acquire()
 	fsh = files_handler.FilesHandler(TreeScanner.db_path)
@@ -34,13 +36,11 @@ class TreeScanner():
 
 	def __init__(self):
 		'initializes the tree scanner'
-		self._logger_file = logging.getLogger('AuPhOrg')
-		self._logger_output = logging.getLogger('StdOutput')
 		self._files_to_add = []
 
 	def __del__(self):
 		'informs about the end of the processing'
-		self._logger_file.info('done processing tree')
+		logger_file.info('done processing tree')
 
 	def init_pool(self, database_path = ""):
 		'initializes the pool of processes that will process the individual files'
@@ -48,25 +48,25 @@ class TreeScanner():
 		self.n_cpus = multiprocessing.cpu_count()
 		if TreeScanner._pool != None:
 			raise RuntimeError
-		self._logger_file.info('starting a pool of %d processes' % self.n_cpus)
+		logger_file.info('starting a pool of %d processes' % self.n_cpus)
 		TreeScanner._pool = multiprocessing.Pool(self.n_cpus)
-		self._logger_file.debug('pool of processes started')
+		logger_file.debug('pool of processes started')
 
 	def scan_tree(self, photostree_root):
 		'walks the tree assigning the files to be processes to the pool of processes'
-		self._logger_file.info('analyzing tree %s' % photostree_root)
+		logger_file.info('analyzing tree %s' % photostree_root)
 		os.path.walk(photostree_root, self._process_dir, None)
 		n_files_to_add = len(self._files_to_add)
-		self._logger_file.info('tree analyzed (%s files to process)' % n_files_to_add)
-		self._logger_file.debug('processing tree')
+		logger_file.info('tree analyzed (%s files to process)' % n_files_to_add)
+		logger_file.debug('processing tree')
 		result = TreeScanner._pool.map_async(file_processor, self._files_to_add)
 		result.wait(10)
 		while not result.ready():
 			percent = 100 * processed.value / n_files_to_add
-			self._logger_output.info('%d out of %d ready (%d%%)' % \
+			logger_output.info('%d out of %d ready (%d%%)' % \
 				(processed.value, n_files_to_add, percent))
 			result.wait(120)
-		self._logger_file.debug('the pool of processes already procesed the tree!')
+		logger_file.debug('the pool of processes already procesed the tree!')
 
 	def _process_dir(self, arg, dir_path, filenames):
 		'processes the files found in the given directory'

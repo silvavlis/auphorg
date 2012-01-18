@@ -24,11 +24,13 @@ for tag in TAGS_TO_GET:
 	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
 CHECKSUM_TOOL = "/usr/bin/sha1sum"
 
+logger_file = logging.getLogger('AuPhOrg')
+logger_output = logging.getLogger('StdOutput')
+
 class ApoFileError(TypeError):
 	'superclass for errors in the files_handler module'
 	def __init__(self):
-		self._logger_file = logging.getLogger('AuPhOrg')
-		self._logger_output = logging.getLogger('StdOutput')
+		pass
 
 class ApoFileUnknown(ApoFileError):
 	'error unknown file format'
@@ -40,8 +42,8 @@ class ApoFileUnknown(ApoFileError):
 	def __str__(self):
 		err_msg = 'file %s cannot be handled, because its extension (%s) is not supported' % \
 			(self.filename, self.fileext)
-		self._logger_file.error = err_msg
-		self._logger_output.error = err_msg
+		logger_file.error = err_msg
+		logger_output.error = err_msg
 		return err_msg
 
 class FilesHandler:
@@ -50,14 +52,12 @@ class FilesHandler:
 
 	def __init__(self, database_path = ""):
 		'initializes the object'
-		self._logger_file = logging.getLogger('AuPhOrg')
-		self._logger_output = logging.getLogger('StdOutput')
 		if database_path == '':
-			self._logger_file.debug('no DB specified in the command line')
+			logger_file.debug('no DB specified in the command line')
 		else:
-			self._logger_file.debug('instanciating the DB backend for %s' % database_path)
+			logger_file.debug('instanciating the DB backend for %s' % database_path)
 		self._db = db_backend.DbConnector(database_path)
-		self._logger_file.debug('DB backend instanciated')
+		logger_file.debug('DB backend instanciated')
 
 	def __del__(self):
 		'close the database object'
@@ -65,11 +65,11 @@ class FilesHandler:
 
 	def _file_checksum(self, path):
 		'calculates the SHA1 checksum of the file'
-		self._logger_file.debug('calculating the checksum of the file %s' % path)
+		logger_file.debug('calculating the checksum of the file %s' % path)
 		cmd = CHECKSUM_TOOL + ' -b "' + path + '"'
 		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		lines = output.read().splitlines()
-		self._logger_file.debug('checksum of file calculated')
+		logger_file.debug('checksum of file calculated')
 		return lines[0].split(' ')[0]
 
 	def _file_info(self, path):
@@ -85,30 +85,30 @@ class FilesHandler:
 
 	def _add_raw_image(self, item_name, path):
 		'adds a raw file to the DB'
-		self._logger_file.debug('adding the RAW file %s to the item %s' % (path, item_name))
+		logger_file.debug('adding the RAW file %s to the item %s' % (path, item_name))
 		# get the required file information
 		(file_checksum, file_time, file_size) = self._file_info(path)
 		# add the file to the DB and to the item
 		self._db.add_raw_file(path, file_time, file_size, file_checksum)
 		self._db.add_item_content(item_name, path)
-		self._logger_file.debug('RAW file added to item')
+		logger_file.debug('RAW file added to item')
 
 	def _image_checksum(self, path):
 		'calculates the SHA512 checksum of the contained image'
-		self._logger_file.debug('calculating the checksum of the image contained in file %s' % path)
+		logger_file.debug('calculating the checksum of the image contained in file %s' % path)
 		try:
 			img = Image.open(path)
 			cksm = hashlib.sha512()
 			cksm.update(img.tostring())
-			self._logger_file.debug('checksum of image calculated')
+			logger_file.debug('checksum of image calculated')
 			return cksm.hexdigest()
 		except Exception, err:
-			self._logger_file.error('Error gettig image from file %s: %s' % (path, str(err)))
-			self._logger_output.error('Error gettig image from file %s: %s' % (path, str(err)))
+			logger_file.error('Error gettig image from file %s: %s' % (path, str(err)))
+			logger_output.error('Error gettig image from file %s: %s' % (path, str(err)))
 
 	def _add_jpeg(self, item_name, path):
 		'adds a JPEG file to the DB'
-		self._logger_file.debug('adding the JPEG file %s to the item %s' % (path, item_name))
+		logger_file.debug('adding the JPEG file %s to the item %s' % (path, item_name))
 		# get the tags of the file
 		exif_tags = {}
 		cmd = EXIFTOOL_REQUEST + ' "' + path + '"'
@@ -124,11 +124,11 @@ class FilesHandler:
 		# add the file to the DB and to the item
 		self._db.add_rich_file(path, file_time, file_size, file_checksum, content_checksum, exif_tags)
 		self._db.add_item_tags(item_name, path)
-		self._logger_file.debug('JPEG file added to item')
+		logger_file.debug('JPEG file added to item')
 
 	def _add_image(self, item_name, path):
 		'adds a TIFF file to the DB'
-		self._logger_file.debug('adding the TIFF file %s to the item %s' % (path, item_name))
+		logger_file.debug('adding the TIFF file %s to the item %s' % (path, item_name))
 		# calculate the checksum of the image
 		content_checksum = self._image_checksum(path)
 		# get the required file information
@@ -136,20 +136,20 @@ class FilesHandler:
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
-		self._logger_file.debug('TIFF file added to item')
+		logger_file.debug('TIFF file added to item')
 
 	def _video_checksum(self, path):
 		'calculates the checksum of a video, using ffmpeg and md5sum'
-		self._logger_file.debug('calculating the checksum of the video contained in file %s' % path)
+		logger_file.debug('calculating the checksum of the video contained in file %s' % path)
 		cmd = '/usr/bin/ffmpeg -i "' + path + '" -f avi - 2> /dev/null | /usr/bin/sha512sum -b'
 		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		result = output.read().splitlines()[0]
-		self._logger_file.debug('checksum of video calculated')
+		logger_file.debug('checksum of video calculated')
 		return result.split(' ')[0]
 
 	def _add_video(self, item_name, path):
 		'adds a video file to the DB'
-		self._logger_file.debug('adding the video file %s to the item %s' % (path, item_name))
+		logger_file.debug('adding the video file %s to the item %s' % (path, item_name))
 		# calculate the checksum of the video
 		content_checksum = self._video_checksum(path)
 		# get the required file information
@@ -157,24 +157,24 @@ class FilesHandler:
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
-		self._logger_file.debug('video file added to item')
+		logger_file.debug('video file added to item')
 
 	def _wav_checksum(self, path):
 		'calculates the checksum of a wave file'
-		self._logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
+		logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
 		try:
 			wav = wave.open(path, 'rb')
 			cksm = hashlib.sha512()
 			cksm.update(wav.readframes(wav.getnframes()))
-			self._logger_file.debug('checksum of audio calculated')
+			logger_file.debug('checksum of audio calculated')
 			return cksm.hexdigest()
 		except Exception, err:
-			self._logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
-			self._logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+			logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+			logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
 
 	def _add_audio(self, item_name, path):
 		'adds a video file to the DB'
-		self._logger_file.debug('adding the audio file %s to the item %s' % (path, item_name))
+		logger_file.debug('adding the audio file %s to the item %s' % (path, item_name))
 		# calculate the checksum of the audio
 		content_checksum = self._wav_checksum(path)
 		# get the required file information
@@ -182,27 +182,28 @@ class FilesHandler:
 		# add the file to the DB
 		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
-		self._logger_file.debug('audio file added to item')
+		logger_file.debug('audio file added to item')
 
 	def is_older(self, path):
 		pass
 
 	def add_file(self, path):
 		'adds the file of the given path to the DB'
-		self._logger_file.debug('adding the file %s' % path)
+		logger_file.debug('adding the file %s' % path)
 		# test that path is file
 		if not os.path.isfile(path):
 			raise RuntimeError, "path isn't a file!"
 		# get file extension to find out type of file
 		(item_name, extension) = os.path.splitext(path)
 		extension = extension.lower()
+		#TODO: don't check if the item exists, simply try to add the file to the item and create it if required
 		# check if the item already exists
 		item = self._db.get_item(item_name)
 		# if item doesn't exist, create a new item for the file
 		if (item == None):
-			self._logger_file.debug("adding the item %s, because it didn't existed yet" % item_name)
+			logger_file.debug("adding the item %s, because it didn't existed yet" % item_name)
 			self._db.add_item(item_name)
-			self._logger_file.debug("item added for the file %s" % path)
+			logger_file.debug("item added for the file %s" % path)
 		# if JPEG file
 		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 			self._add_jpeg(item_name, path)
@@ -215,7 +216,7 @@ class FilesHandler:
 		elif (extension in ('.wav')):
 			self._add_audio(item_name, path)
 		elif (extension in self.ignore_exts):
-			self._logger_file.debug('Ignore file')
+			logger_file.debug('Ignore file')
 		else:
 			raise ApoFileUnknown(path)
-		self._logger_file.debug('file added')
+		logger_file.debug('file added')
