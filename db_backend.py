@@ -374,14 +374,11 @@ class DbConnector:
 		'returns the specified item'
 		logger_file.debug('getting item %s' % item_name)
 		self._db_curs.execute('SELECT * FROM items WHERE name = ?;', [item_name])
-		try:
-			(item_name, content_file, tags_file) = self._db_curs.fetchone()
-		except TypeError, err:
-			if (str(err) == "'NoneType' object is not iterable"):
-				logger_file.debug("item %s doesn't exist yet" % item_name)
-				return None
-			else:
-				raise
+		result = self._db_curs.fetchone()
+		if result == None:
+			logger_file.debug("item %s doesn't exist yet" % item_name)
+			return None
+		(item_name, content_file, tags_file) = result
 		if (tags_file != None):
 			tags = self._get_rich_file_tags(tags_file)
 		else:
