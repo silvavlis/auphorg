@@ -286,26 +286,16 @@ class DbConnector:
 	# Public methods
 	#
 
-	def add_non_raw_file(self, path, timestamp, file_size, file_checksum, content_checksum):
-		'adds a non raw file without metadata to the DB'
-		logger_file.debug('adding non RAW file %s', path)
+	def add_poor_file(self, path, timestamp, file_size, file_checksum, content_checksum):
+		'adds a file without metadata to the DB'
+		logger_file.debug('adding poor file %s', path)
 		self._edit_element('files', {\
 			'path': path, \
 			'timestamp': timestamp, \
 			'file_size': file_size, \
 			'file_checksum': file_checksum, \
 			'content_checksum': content_checksum})
-		logger_file.debug('non RAW file added')
-
-	def add_raw_file(self, path, timestamp, file_size, file_checksum):
-		'adds a raw file without metadata to the DB'
-		logger_file.debug('adding RAW file %s', path)
-		self._edit_element('files', {\
-			'path': path, \
-			'timestamp': timestamp, \
-			'file_size': file_size, \
-			'file_checksum': file_checksum})
-		logger_file.debug('RAW file added')
+		logger_file.debug('poor file added')
 
 	def add_rich_file(self, path, timestamp, file_size, file_checksum, image_checksum, tags):
 		'adds a file with metadata to the DB'

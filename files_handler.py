@@ -84,16 +84,6 @@ class FilesHandler:
 		# return the values
 		return (checksum, time, size)
 
-	def _add_raw_image(self, item_name, path):
-		'adds a raw file to the DB'
-		logger_file.debug('adding the RAW file %s to the item %s' % (path, item_name))
-		# get the required file information
-		(file_checksum, file_time, file_size) = self._file_info(path)
-		# add the file to the DB and to the item
-		self._db.add_raw_file(path, file_time, file_size, file_checksum)
-		self._db.add_item_content(item_name, path)
-		logger_file.debug('RAW file added to item')
-
 	def _image_checksum(self, path):
 		'calculates the SHA512 checksum of the contained image'
 		logger_file.debug('calculating the checksum of the image contained in file %s' % path)
@@ -127,17 +117,20 @@ class FilesHandler:
 		self._db.add_item_tags(item_name, path)
 		logger_file.debug('JPEG file added to item')
 
-	def _add_image(self, item_name, path):
-		'adds a TIFF file to the DB'
-		logger_file.debug('adding the TIFF file %s to the item %s' % (path, item_name))
-		# calculate the checksum of the image
-		content_checksum = self._image_checksum(path)
+	def _add_poor_file(self, item_type, item_name, path, cntt_cksm_fnt):
+		'adds a poor file to the DB'
+		logger_file.debug('adding the %s file %s to the item %s' % (item_type, path, item_name))
 		# get the required file information
 		(file_checksum, file_time, file_size) = self._file_info(path)
+		# calculate the checksum of the file content, if possible
+		if cntt_cksm_fnt == None:
+			content_checksum = file_checksum
+		else:
+			content_checksum = cntt_cksm_fnt(path)
 		# add the file to the DB
-		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
+		self._db.add_poor_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
-		logger_file.debug('TIFF file added to item')
+		logger_file.debug('%s file added to item' % item_type)
 
 	def _video_checksum(self, path):
 		'calculates the checksum of a video, using ffmpeg and md5sum'
@@ -147,18 +140,6 @@ class FilesHandler:
 		result = output.read().splitlines()[0]
 		logger_file.debug('checksum of video calculated')
 		return result.split(' ')[0]
-
-	def _add_video(self, item_name, path):
-		'adds a video file to the DB'
-		logger_file.debug('adding the video file %s to the item %s' % (path, item_name))
-		# calculate the checksum of the video
-		content_checksum = self._video_checksum(path)
-		# get the required file information
-		(file_checksum, file_time, file_size) = self._file_info(path)
-		# add the file to the DB
-		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
-		self._db.add_item_content(item_name, path)
-		logger_file.debug('video file added to item')
 
 	def _wav_checksum(self, path):
 		'calculates the checksum of a wave file'
@@ -172,18 +153,6 @@ class FilesHandler:
 		except Exception, err:
 			logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
 			logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
-
-	def _add_audio(self, item_name, path):
-		'adds a video file to the DB'
-		logger_file.debug('adding the audio file %s to the item %s' % (path, item_name))
-		# calculate the checksum of the audio
-		content_checksum = self._wav_checksum(path)
-		# get the required file information
-		(file_checksum, file_time, file_size) = self._file_info(path)
-		# add the file to the DB
-		self._db.add_non_raw_file(path, file_time, file_size, file_checksum, content_checksum)
-		self._db.add_item_content(item_name, path)
-		logger_file.debug('audio file added to item')
 
 	def is_older(self, path):
 		pass
@@ -203,13 +172,13 @@ class FilesHandler:
 		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 			self._add_jpeg(item_name, path)
 		elif (extension in ('.avi', '.mov', '.wmv')):
-			self._add_video(item_name, path)
+			self._add_poor_file('video', item_name, path, self._video_checksum)
 		elif (extension in ('.raw', '.rw2')):
-			self._add_raw_image(item_name, path)
+			self._add_poor_file('RAW', item_name, path, None)
 		elif (extension in ('.tif')):
-			self._add_image(item_name, path)
+			self._add_poor_file('TIFF', item_name, path, self._image_checksum)
 		elif (extension in ('.wav')):
-			self._add_audio(item_name, path)
+			self._add_poor_file('audio', item_name, path, self._wav_checksum)
 		elif (extension in self.ignore_exts):
 			logger_file.debug('Ignore file')
 		else:
