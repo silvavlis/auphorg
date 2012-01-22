@@ -50,13 +50,14 @@ class FilesHandler:
 	'handles the specified multimedia files'
 	ignore_exts = ('.db', '.strm')
 
-	def __init__(self, database_path = ""):
+	def __init__(self, lock, database_path = ""):
 		'initializes the object'
+		self._lock = lock
 		if database_path == '':
 			logger_file.debug('no DB specified in the command line')
 		else:
 			logger_file.debug('instanciating the DB backend for %s' % database_path)
-		self._db = db_backend.DbConnector(database_path)
+		self._db = db_backend.DbConnector(lock, database_path)
 		logger_file.debug('DB backend instanciated')
 
 	def __del__(self):

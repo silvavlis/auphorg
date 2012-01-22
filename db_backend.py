@@ -157,8 +157,9 @@ class DbConnector:
 	# Private methods
 	#
 
-	def __init__(self, db_path=''):
+	def __init__(self, lock, db_path=''):
 		'connects to DB for saving collection'
+		self._lock = lock
 		# connect to the DB
 		if db_path == '':
 			# if no DB path given, then use the tests DB
@@ -322,6 +323,7 @@ class DbConnector:
 	def add_item(self, name, force):
 		'adds a multimedia item to the DB'
 		logger_file.debug('adding item %s' % name)
+		self._lock.acquire()
 		# check if the item already exists
 		self._db_curs.execute('SELECT name FROM items WHERE name = ?;', [name])
 		result = self._db_curs.fetchone()
@@ -335,6 +337,7 @@ class DbConnector:
 				raise ApoDbItemExists(name)
 			else:
 				logger_file.debug('item already exists, not adding it')
+		self._lock.release()
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'

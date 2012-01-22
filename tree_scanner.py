@@ -20,7 +20,7 @@ def file_processor(filepath):
 	'process the given file'
 	logger_file.debug('adding file %s' % filepath)
 	lock.acquire()
-	fsh = files_handler.FilesHandler(TreeScanner.db_path)
+	fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
 	lock.release()
 	fsh.add_file(unicode(filepath, 'utf-8'))
 	lock.acquire()
