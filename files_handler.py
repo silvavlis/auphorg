@@ -27,7 +27,7 @@ CHECKSUM_TOOL = "/usr/bin/sha1sum"
 logger_file = logging.getLogger('AuPhOrg')
 logger_output = logging.getLogger('StdOutput')
 
-class ApoFileError(TypeError):
+class ApoFileError:
 	'superclass for errors in the files_handler module'
 	def __init__(self):
 		pass
@@ -35,7 +35,8 @@ class ApoFileError(TypeError):
 class ApoFileUnknown(ApoFileError):
 	'error unknown file format'
 	def __init__(self, filename):
-		super(ApoFileUnknown, self).__init__()
+		#TODO: check error reporting that 2 parameters required, but only 1 passed
+		super(ApoFileUnknown, self).__init__(filename)
 		self.filename = filename
 		self.fileext = os.path.splitext(filename)[1][1:]
 
@@ -157,7 +158,7 @@ class FilesHandler:
 	def is_older(self, path):
 		pass
 
-	def add_file(self, path):
+	def add_file(self, path, force=False):
 		'adds the file of the given path to the DB'
 		logger_file.debug('adding the file %s' % path)
 		# test that path is file
@@ -168,19 +169,23 @@ class FilesHandler:
 		extension = extension.lower()
 		# create a new item for the file (it does nothing if it already exists)
 		self._db.add_item(item_name, force=False)
-		# add the file to the corresponding item
-		if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
-			self._add_jpeg(item_name, path)
-		elif (extension in ('.avi', '.mov', '.wmv')):
-			self._add_poor_file('video', item_name, path, self._video_checksum)
-		elif (extension in ('.raw', '.rw2')):
-			self._add_poor_file('RAW', item_name, path, None)
-		elif (extension in ('.tif')):
-			self._add_poor_file('TIFF', item_name, path, self._image_checksum)
-		elif (extension in ('.wav')):
-			self._add_poor_file('audio', item_name, path, self._wav_checksum)
-		elif (extension in self.ignore_exts):
-			logger_file.debug('Ignore file')
+		# add the file to the corresponding item, if it wasn't yet
+		if (force == False) and (self._db.file_exists(path)):
+			logger_file.info('file %s already exists, not adding it' % path)
 		else:
-			raise ApoFileUnknown(path)
+			if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
+				self._add_jpeg(item_name, path)
+			elif (extension in ('.avi', '.mov', '.wmv')):
+				self._add_poor_file('video', item_name, path, self._video_checksum)
+			elif (extension in ('.raw', '.rw2')):
+				self._add_poor_file('RAW', item_name, path, None)
+			elif (extension in ('.tif')):
+				self._add_poor_file('TIFF', item_name, path, self._image_checksum)
+			elif (extension in ('.wav')):
+				self._add_poor_file('audio', item_name, path, self._wav_checksum)
+			elif (extension in self.ignore_exts):
+				logger_file.debug('Ignore file')
+			else:
+				#TODO: check error reporting that 2 parameters required, but only 1 passed
+				raise ApoFileUnknown(path)
 		logger_file.debug('file added')

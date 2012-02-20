@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-'''scans the specified directory looking for files to be added to the list of photos'''
 import sys
 import os.path
 import files_handler
@@ -18,14 +17,32 @@ logger_output = logging.getLogger('StdOutput')
 # processes a single file
 def file_processor(filepath):
 	'process the given file'
+	filepath = unicode(filepath, 'utf-8')
 	logger_file.debug('adding file %s' % filepath)
+	logger_output.debug('adding file %s' % filepath)
+#	# check if the file has been already added previously to the DB
+#	db = db_backend.DbConnector(TreeScanner.db_path, lock)
+#	logger_file.info('hi %s' % filepath)
+#	#if db.file_exists(unicode(filepath, 'utf-8')):
+#	if db.file_exists(filepath):
+#		logger_file.info('file %s was already in the DB' % filepath)
+#		return
+#	else:
+#		logger_file.info('file %s was not in the DB yet' % filepath)
+#	# here if file not in DB, add it
+	logger_file.debug('acquiring lock')
 	lock.acquire()
+	logger_file.debug('lock acquired')
 	fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
 	lock.release()
-	fsh.add_file(unicode(filepath, 'utf-8'))
+	logger_file.debug('lock released')
+	fsh.add_file(filepath)
+	logger_file.debug('acquiring lock')
 	lock.acquire()
+	logger_file.debug('lock acquired')
 	processed.value += 1
 	lock.release()
+	logger_file.debug('lock released')
 	logger_file.info('done adding file %s' % filepath)
 
 # scans the given tree and tries to add the found files to the DB
@@ -55,9 +72,11 @@ class TreeScanner():
 	def scan_tree(self, photostree_root):
 		'walks the tree assigning the files to be processes to the pool of processes'
 		logger_file.info('analyzing tree %s' % photostree_root)
+		logger_output.info('analyzing tree %s' % photostree_root)
 		os.path.walk(photostree_root, self._process_dir, None)
 		n_files_to_add = len(self._files_to_add)
-		logger_file.info('tree analyzed (%s files to process)' % n_files_to_add)
+		logger_file.info('tree analyzed: %s files to process' % n_files_to_add)
+		logger_output.info('tree analyzed: %s files to process' % n_files_to_add)
 		logger_file.debug('processing tree')
 		result = TreeScanner._pool.map_async(file_processor, self._files_to_add)
 		result.wait(10)
@@ -66,7 +85,8 @@ class TreeScanner():
 			logger_output.info('%d out of %d ready (%d%%)' % \
 				(processed.value, n_files_to_add, percent))
 			result.wait(120)
-		logger_file.debug('the pool of processes already procesed the tree!')
+		logger_file.debug('the pool of processes already processed the tree!')
+		logger_output.info('done processing the tree!')
 
 	def _process_dir(self, arg, dir_path, filenames):
 		'processes the files found in the given directory'
@@ -76,13 +96,13 @@ class TreeScanner():
 				self._files_to_add.append(filepath)
 
 # configure a logger
-def config_logger(log_handler, log_format, logger_name):
+def config_logger(log_handler, log_format, logger_name, logging_level = logging.INFO):
 	'configures a logger'
 	formatter = logging.Formatter(log_format)
 	log_handler.setFormatter(formatter)
 	logger = logging.getLogger(logger_name)
 	logger.addHandler(log_handler)
-	logger.setLevel(logging.INFO)
+	logger.setLevel(logging_level)
 	return logger
 
 # parse the command line arguments
@@ -97,7 +117,8 @@ def parse_args():
 		help='use the database that can be found in DATABASE_PATH or create it new there')
 	(options, args) = parser.parse_args()
 	if options.tree_root == None:
-		logger_file.error('The root directory of the tree to be scanned is required!')
+		logger_file.error("The root directory of the tree to be scanned is required! (option '-r')")
+		logger_output.error("The root directory of the tree to be scanned is required! (option '-r')")
 		sys.exit()
 	if options.verbosity == '0':
 		verbosity = logging.CRITICAL
@@ -113,16 +134,20 @@ def parse_args():
 		verbosity = logging.ERROR
 	logger_file.setLevel(verbosity)
 	if options.db_path == None:
-		logger_file.info('no DB specified in the command line, the testing DB will be used')
-		options.db_path = ""
+		logger_file.error("no DB specified in the command line (option '-d')")
+		logger_output.error("no DB specified in the command line (option '-d')")
+		sys.exit()
+	logger_output.info("tree to scan => %s" % options.tree_root)
+	logger_output.info("path of the DB => %s" % options.db_path)
 	return (options.tree_root, options.db_path)
 
 #command line execution
 if __name__ == '__main__':
 	# output a separator to both the logging file and the standard output
 	sep_format = '**************** %(asctime)s %(message)s ****************'
-	log_file = logging.FileHandler('./auphorg.log')
-	logger_file = config_logger(log_file, sep_format, 'AuPhOrg')
+	log_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'auphorg.log')
+	log_file = logging.FileHandler(log_filename)
+	logger_file = config_logger(log_file, sep_format, 'AuPhOrg', logging.DEBUG)
 	logger_file.info('New log entry')
 	log_output = logging.StreamHandler(sys.stdout)
 	logger_output = config_logger(log_output, sep_format, 'StdOutput')

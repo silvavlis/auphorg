@@ -64,7 +64,7 @@ SCHEMA_FULL_ITEMS_VIEW = 'CREATE VIEW full_items AS ' + \
 logger_file = logging.getLogger('AuPhOrg')
 
 # exceptions
-class ApoDbError(ValueError):
+class ApoDbError:
 	def __init__(self):
 		pass
 
@@ -310,10 +310,25 @@ class DbConnector:
 			'tags': tags_index})
 		logger_file.debug('rich file added')
 
+	def file_exists(self, path):
+		' returns true if the file already exists in the DB'
+		self._db_curs.execute('SELECT file_id FROM files WHERE path = ?;', [path])
+		result = self._db_curs.fetchone()
+		if result == None:
+			# if file doesn't exist yet, return false
+			logger_file.debug("file %s doesn't exist in the DB" % path)
+			return False
+		else:
+			# if file already exists, return true
+			logger_file.debug("file %s already exists in the DB" % path)
+			return True
+
 	def add_item(self, name, force):
 		'adds a multimedia item to the DB'
 		logger_file.debug('adding item %s' % name)
+		logger_file.debug('acquiring lock')
 		self._lock.acquire()
+		logger_file.debug('lock acquired')
 		# check if the item already exists
 		self._db_curs.execute('SELECT name FROM items WHERE name = ?;', [name])
 		result = self._db_curs.fetchone()
@@ -328,6 +343,7 @@ class DbConnector:
 			else:
 				logger_file.debug('item already exists, not adding it')
 		self._lock.release()
+		logger_file.debug('lock released')
 
 	def add_item_content(self, name, content_file):
 		'adds a content file to a multimedia item into the DB'
