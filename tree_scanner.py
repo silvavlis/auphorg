@@ -36,14 +36,15 @@ def file_processor(filepath):
 	lock.release()
 	logger_file.debug('lock released')
 	try:
-		fsh.add_file(filepath)
+		file_added = fsh.add_file(filepath)
 	except:
 		logger_file.error('Error when processing file %s: %s' % \
 			(filepath, str(sys.exc_info())))
 		increase_counter()
 		return
 	increase_counter()
-	logger_file.info('done adding file n. %d: %s' % (file_index, filepath))
+	if file_added:
+		logger_file.info('done adding file n. %d: %s' % (file_index, filepath))
 
 def increase_counter():
 	logger_file.debug('acquiring lock')

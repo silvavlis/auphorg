@@ -153,7 +153,7 @@ class FilesHandler:
 		# add the file to the DB
 		self._db.add_poor_file(path, file_time, file_size, file_checksum, content_checksum)
 		self._db.add_item_content(item_name, path)
-		logger_file.debug('%s file added to item' % item_type)
+		logger_file.debug('file added to item: %s' % item_type)
 
 	def is_older(self, path):
 		pass
@@ -171,7 +171,8 @@ class FilesHandler:
 		self._db.add_item(item_name, force=False)
 		# add the file to the corresponding item, if it wasn't yet
 		if (force == False) and (self._db.file_exists(path)):
-			logger_file.warning('file %s already exists, not adding it' % path)
+			logger_file.warning('file already exists, not adding it: %s' % path)
+			return False
 		else:
 			if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 				self._add_jpeg(item_name, path)
@@ -188,4 +189,5 @@ class FilesHandler:
 			else:
 				#TODO: check error reporting that 2 parameters required, but only 1 passed
 				raise ApoFileUnknown(path)
-		logger_file.debug('file added')
+			logger_file.debug('file added')
+			return True
