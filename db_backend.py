@@ -341,7 +341,7 @@ class DbConnector:
 			if force == True:
 				raise ApoDbItemExists(name)
 			else:
-				logger_file.debug('item already exists, not adding it')
+				logger_file.debug('item %s already exists, not adding it' % name)
 		self._lock.release()
 		logger_file.debug('lock released')
 

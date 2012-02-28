@@ -18,32 +18,40 @@ logger_output = logging.getLogger('StdOutput')
 def file_processor(filepath):
 	'process the given file'
 	filepath = unicode(filepath, 'utf-8')
-	logger_file.debug('adding file %s' % filepath)
+	file_index = processed.value
+	logger_file.debug('adding file n. %d: %s' % (file_index, filepath))
 	logger_output.debug('adding file %s' % filepath)
-#	# check if the file has been already added previously to the DB
-#	db = db_backend.DbConnector(TreeScanner.db_path, lock)
-#	logger_file.info('hi %s' % filepath)
-#	#if db.file_exists(unicode(filepath, 'utf-8')):
-#	if db.file_exists(filepath):
-#		logger_file.info('file %s was already in the DB' % filepath)
-#		return
-#	else:
-#		logger_file.info('file %s was not in the DB yet' % filepath)
-#	# here if file not in DB, add it
 	logger_file.debug('acquiring lock')
 	lock.acquire()
 	logger_file.debug('lock acquired')
-	fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
+	try:
+		fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
+	except:
+		logger_file.error('Error when creating FileHandler to process file %s: %s' % \
+			(filepath, str(sys.exc_info())))
+		lock.release()
+		logger_file.debug('lock released')
+		increase_counter()
+		return
 	lock.release()
 	logger_file.debug('lock released')
-	fsh.add_file(filepath)
+	try:
+		fsh.add_file(filepath)
+	except:
+		logger_file.error('Error when processing file %s: %s' % \
+			(filepath, str(sys.exc_info())))
+		increase_counter()
+		return
+	increase_counter()
+	logger_file.info('done adding file n. %d: %s' % (file_index, filepath))
+
+def increase_counter():
 	logger_file.debug('acquiring lock')
 	lock.acquire()
 	logger_file.debug('lock acquired')
 	processed.value += 1
 	lock.release()
 	logger_file.debug('lock released')
-	logger_file.info('done adding file %s' % filepath)
 
 # scans the given tree and tries to add the found files to the DB
 class TreeScanner():
@@ -79,12 +87,13 @@ class TreeScanner():
 		logger_output.info('tree analyzed: %s files to process' % n_files_to_add)
 		logger_file.debug('processing tree')
 		result = TreeScanner._pool.map_async(file_processor, self._files_to_add)
-		result.wait(10)
+		status_update_s = 120
+		result.wait(status_update_s)
 		while not result.ready():
 			percent = 100 * processed.value / n_files_to_add
 			logger_output.info('%d out of %d ready (%d%%)' % \
 				(processed.value, n_files_to_add, percent))
-			result.wait(120)
+			result.wait(status_update_s)
 		logger_file.debug('the pool of processes already processed the tree!')
 		logger_output.info('done processing the tree!')
 

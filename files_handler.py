@@ -171,7 +171,7 @@ class FilesHandler:
 		self._db.add_item(item_name, force=False)
 		# add the file to the corresponding item, if it wasn't yet
 		if (force == False) and (self._db.file_exists(path)):
-			logger_file.info('file %s already exists, not adding it' % path)
+			logger_file.warning('file %s already exists, not adding it' % path)
 		else:
 			if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
 				self._add_jpeg(item_name, path)
