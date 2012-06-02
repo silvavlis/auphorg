@@ -22,7 +22,14 @@ EXIF_TOOL = "/usr/bin/exiftool"
 EXIFTOOL_REQUEST = EXIF_TOOL + ' -s'
 for tag in TAGS_TO_GET:
 	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
-CHECKSUM_TOOL = "/usr/bin/sha1sum"
+DD_TOOL = "/bin/dd"
+READ_FILE_KBS = 64
+CHECKSUM_TOOL = "/usr/bin/sha512sum"
+READ_IMAGE_SIZE = (100, 100)
+VIDEO_DECODER="/usr/bin/ffmpeg"
+SKIP_VIDEO_KBS = 128
+READ_VIDEO_KBS = 64
+READ_WAV_FRAMES = 5000
 
 logger_file = logging.getLogger('AuPhOrg')
 logger_output = logging.getLogger('StdOutput')
@@ -31,6 +38,9 @@ class ApoFileError:
 	'superclass for errors in the files_handler module'
 	def __init__(self):
 		pass
+
+	def __str__(self):
+		return 'generic expection of the file ' + __file__
 
 class ApoFileUnknown(ApoFileError):
 	'error unknown file format'
@@ -68,7 +78,7 @@ class FilesHandler:
 	def _file_checksum(self, path):
 		'calculates the SHA1 checksum of the file'
 		logger_file.debug('calculating the checksum of the file %s' % path)
-		cmd = CHECKSUM_TOOL + ' -b "' + path + '"'
+		cmd = '%s bs=1K count=%d if="%s" 2> /dev/null | %s -b' % (DD_TOOL, READ_FILE_KBS, path, CHECKSUM_TOOL)
 		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		lines = output.read().splitlines()
 		logger_file.debug('checksum of file calculated')
@@ -91,6 +101,7 @@ class FilesHandler:
 		try:
 			img = Image.open(path)
 			cksm = hashlib.sha512()
+			img.thumbnail(READ_IMAGE_SIZE)
 			cksm.update(img.tostring())
 			logger_file.debug('checksum of image calculated')
 			return cksm.hexdigest()
@@ -99,9 +110,10 @@ class FilesHandler:
 			logger_output.error('Error gettig image from file %s: %s' % (path, str(err)))
 
 	def _video_checksum(self, path):
-		'calculates the checksum of a video, using ffmpeg and md5sum'
+		'calculates the checksum of a video, using ffmpeg and sha512sum'
 		logger_file.debug('calculating the checksum of the video contained in file %s' % path)
-		cmd = '/usr/bin/ffmpeg -i "' + path + '" -f avi - 2> /dev/null | /usr/bin/sha512sum -b'
+		cmd = '%s bs=1K skip=%d count=%d if="%s" 2> /dev/null | %s -i pipe:0 -f avi - 2> /dev/null | %s -b' % \
+			(DD_TOOL, SKIP_VIDEO_KBS, READ_VIDEO_KBS, path, VIDEO_DECODER, CHECKSUM_TOOL)
 		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
 		result = output.read().splitlines()[0]
 		logger_file.debug('checksum of video calculated')
@@ -113,7 +125,7 @@ class FilesHandler:
 		try:
 			wav = wave.open(path, 'rb')
 			cksm = hashlib.sha512()
-			cksm.update(wav.readframes(wav.getnframes()))
+			cksm.update(wav.readframes(READ_WAV_FRAMES))
 			logger_file.debug('checksum of audio calculated')
 			return cksm.hexdigest()
 		except Exception, err:
