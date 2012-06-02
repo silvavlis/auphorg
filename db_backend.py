@@ -3,7 +3,6 @@
 import os
 import sqlite3
 import re
-import inspect
 import logging
 
 DB_PATH_TEST = os.path.join('/tmp/test_auphorg.db')
@@ -167,7 +166,7 @@ class DbConnector:
 			db_path = DB_PATH_TEST
 		logger_file.debug('connecting to DB %s' % db_path)
 		self._db_path = db_path
-		self._photos_db = sqlite3.connect(self._db_path)
+		self._photos_db = sqlite3.connect(self._db_path, 30)
 		self._db_curs = self._photos_db.cursor()
 		logger_file.debug('connection to DB established')
 		# if database doesn't have the schema yet, create it
@@ -191,7 +190,7 @@ class DbConnector:
 	def __del__(self):
 		'closes the connection to the DB before destroying the object'
 		logger_file.debug('closing connection with DB')
-		self._photos_db.close()
+        self._photos_db.close()
 		logger_file.debug('connection with DB closed')
 
 	def _insert_query(self, table, values):
@@ -216,7 +215,6 @@ class DbConnector:
 		logger_file.debug('updating entry of table %s that matches filter %s with values %s' \
 			% (table, str(element_filters), str(values)))
 		field_names = ''
-		field_placeholders = ''
 		query_values = []
 		for field in values.keys():
 			field_names += field
@@ -366,7 +364,7 @@ class DbConnector:
 		'adds a tags file to a multimedia item into the DB'
 		logger_file.debug('adding to item %s the file %s as its metadata file' % (name, tags_file))
 		# check that the item doesn't contain any tags file yet
-		(_, cf, tf, _) = self.get_item(name)
+		(_, _, tf, _) = self.get_item(name)
 		if tf != None:
 			raise ApoDbTagsExists(tags_file, name)
 		# add the tags file to the item
@@ -375,7 +373,7 @@ class DbConnector:
 		try:
 			tags_file_id = cur.fetchone()[0]
 		except TypeError:
-			raise ApoDbMissingFile(tags_file, item_name)
+			raise ApoDbMissingFile(tags_file, name)
 		self._edit_element('simple_items', {'tags_file': tags_file_id}, {'name': name})
 		logger_file.debug('item added')
 
