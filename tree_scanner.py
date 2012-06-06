@@ -7,6 +7,7 @@ import files_handler
 import logging
 import multiprocessing
 import optparse
+import traceback
 
 lock = None
 processed = None
@@ -18,8 +19,14 @@ logger_output = logging.getLogger('StdOutput')
 def file_processor(filepath):
 	'process the given file'
 	filepath = unicode(filepath, 'utf-8')
+	logger_file.debug('acquiring lock')
+	lock.acquire()
+	logger_file.debug('lock acquired')
 	file_index = processed.value
 	logger_file.debug('adding file n. %d: %s' % (file_index, filepath))
+	processed.value += 1
+	lock.release()
+	logger_file.debug('lock released')
 	logger_output.debug('adding file %s' % filepath)
 	logger_file.debug('acquiring lock')
 	lock.acquire()
@@ -27,32 +34,31 @@ def file_processor(filepath):
 	try:
 		fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
 	except:
-		logger_file.error('Error when creating FileHandler to process file %s: %s' % \
-			(filepath, str(sys.exc_info())))
+		(exception_type, exception_value, exception_traceback) = sys.exc_info()
+		logger_file.error('Error when creating FileHandler to process file %s: (%s) %s' % \
+			(filepath, str(exception_type), str(exception_value)))
+		logger_file.error('vvvvvvvvvvvv start of exception stack vvvvvvvvvvvvvvv')
+		for stack_entry in traceback.extract_tb(exception_traceback):
+			logger_file.error(stack_entry)
+		logger_file.error('^^^^^^^^^^^^^ end of exception stack ^^^^^^^^^^^^^^^^')
 		lock.release()
 		logger_file.debug('lock released')
-		increase_counter()
 		return
 	lock.release()
 	logger_file.debug('lock released')
 	try:
 		file_added = fsh.add_file(filepath)
 	except:
-		logger_file.error('Error when processing file %s: %s' % \
-			(filepath, str(sys.exc_info())))
-		increase_counter()
+		(exception_type, exception_value, exception_traceback) = sys.exc_info()
+		logger_file.error('Error when processing file %s: (%s) %s' % \
+			(filepath, str(exception_type), str(exception_value)))
+		logger_file.error('vvvvvvvvvvvv start of exception stack vvvvvvvvvvvvvvv')
+		for stack_entry in traceback.extract_tb(exception_traceback):
+			logger_file.error(stack_entry)
+		logger_file.error('^^^^^^^^^^^^^ end of exception stack ^^^^^^^^^^^^^^^^')
 		return
-	increase_counter()
 	if file_added:
 		logger_file.info('done adding file n. %d: %s' % (file_index, filepath))
-
-def increase_counter():
-	logger_file.debug('acquiring lock')
-	lock.acquire()
-	logger_file.debug('lock acquired')
-	processed.value += 1
-	lock.release()
-	logger_file.debug('lock released')
 
 # scans the given tree and tries to add the found files to the DB
 class TreeScanner():
@@ -68,10 +74,12 @@ class TreeScanner():
 		'informs about the end of the processing'
 		logger_file.info('done processing tree')
 
-	def init_pool(self, database_path = ""):
+	def init_pool(self, background, database_path = ""):
 		'initializes the pool of processes that will process the individual files'
 		TreeScanner.db_path = database_path
 		self.n_cpus = multiprocessing.cpu_count()
+		if background and (self.n_cpus > 1):
+			self.n_cpus = self.n_cpus - 1
 		if TreeScanner._pool != None:
 			raise RuntimeError
 		logger_file.info('starting a pool of %d processes' % self.n_cpus)
@@ -125,7 +133,9 @@ def parse_args():
 		help='set the verbosity level to VERBOSITY_LEVEL')
 	parser.add_option('-d', '--db', dest='db_path', metavar='DATABASE_PATH', \
 		help='use the database that can be found in DATABASE_PATH or create it new there')
-	(options, args) = parser.parse_args()
+	parser.add_option('-b', '--background', dest='background', action='store_true', default=False, \
+		help="if more than one CPU available, leave one CPU unused for other tasks")
+	(options, _) = parser.parse_args()
 	if options.tree_root == None:
 		logger_file.error("The root directory of the tree to be scanned is required! (option '-r')")
 		logger_output.error("The root directory of the tree to be scanned is required! (option '-r')")
@@ -149,7 +159,7 @@ def parse_args():
 		sys.exit()
 	logger_output.info("tree to scan => %s" % options.tree_root)
 	logger_output.info("path of the DB => %s" % options.db_path)
-	return (options.tree_root, options.db_path)
+	return (options.tree_root, options.db_path, options.background)
 
 #command line execution
 if __name__ == '__main__':
@@ -167,16 +177,16 @@ if __name__ == '__main__':
 	logger_file = config_logger(log_file, log_format, 'AuPhOrg')
 	log_format = '%(asctime)s > %(message)s'
 	logger_output = config_logger(log_output, log_format, 'StdOutput')
+	logger_output.info('logging file => ' + log_filename)
 	# parse the arguments
-	(tree_root, db_path) = parse_args()
+	(tree_root, db_path, background) = parse_args()
 	# initialize the variables required for keeping track of the number of processed files
 	lock = multiprocessing.Lock()
-	#TODO: WHAT HAPPENS WITH THE LOCKS!!
 	if lock.acquire(False) == False:
 		logger_file.warning("lock wasn't properly released by a previous run, releasing it now")
 	lock.release()
 	processed = multiprocessing.Value('i', 0)
 	# start processing the tree
 	tree_scanner = TreeScanner()
-	tree_scanner.init_pool(db_path)
+	tree_scanner.init_pool(background, db_path)
 	tree_scanner.scan_tree(tree_root)
