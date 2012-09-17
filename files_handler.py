@@ -106,8 +106,8 @@ class FilesHandler:
 			logger_file.debug('checksum of image calculated')
 			return cksm.hexdigest()
 		except Exception, err:
-			logger_file.error('Error gettig image from file %s: %s' % (path, str(err)))
-			logger_output.error('Error gettig image from file %s: %s' % (path, str(err)))
+			logger_file.error('Error getting image from file %s: %s' % (path, str(err)))
+			logger_output.error('Error getting image from file %s: %s' % (path, str(err)))
 
 	def _video_checksum(self, path):
 		'calculates the checksum of a video, using ffmpeg and sha512sum'

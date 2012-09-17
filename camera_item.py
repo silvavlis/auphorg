@@ -80,7 +80,7 @@ class CameraItem:
 			cksm.update(img.tostring())
 			checksum = cksm.digest()
 		except Exception, err:
-			trace_err("Error gettig image from file %s: %s" % (filepath, str(err)))
+			trace_err("Error getting image from file %s: %s" % (filepath, str(err)))
 		return checksum
 
 	def _get_video_checksum(self, filepath):
