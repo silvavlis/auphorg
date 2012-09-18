@@ -7,21 +7,21 @@ import subprocess
 import logging
 
 TAGS_TO_GET = [
-				'Model',
-				'Software',
-				'DateTimeOriginal',
-				'CreateDate',
-				'ImageWidth',
-				'ImageHeight',
-				'TagsList',
-				'HierarchicalSubject',
-				'Subject',
-				'Keywords'
-				]
+                'Model',
+                'Software',
+                'DateTimeOriginal',
+                'CreateDate',
+                'ImageWidth',
+                'ImageHeight',
+                'TagsList',
+                'HierarchicalSubject',
+                'Subject',
+                'Keywords'
+                ]
 EXIF_TOOL = "/usr/bin/exiftool"
 EXIFTOOL_REQUEST = EXIF_TOOL + ' -s'
 for tag in TAGS_TO_GET:
-	EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
+    EXIFTOOL_REQUEST = EXIFTOOL_REQUEST + ' -' + tag
 DD_TOOL = "/bin/dd"
 READ_FILE_KBS = 64
 CHECKSUM_TOOL = "/usr/bin/sha512sum"
@@ -35,171 +35,171 @@ logger_file = logging.getLogger('AuPhOrg')
 logger_output = logging.getLogger('StdOutput')
 
 class ApoFileError:
-	'superclass for errors in the files_handler module'
-	def __init__(self):
-		pass
+    'superclass for errors in the files_handler module'
+    def __init__(self):
+        pass
 
-	def __str__(self):
-		return 'generic expection of the file ' + __file__
+    def __str__(self):
+        return 'generic expection of the file ' + __file__
 
 class ApoFileUnknown(ApoFileError):
-	'error unknown file format'
-	def __init__(self, filename):
-		#TODO: check error reporting that 2 parameters required, but only 1 passed
-		super(ApoFileUnknown, self).__init__(filename)
-		self.filename = filename
-		self.fileext = os.path.splitext(filename)[1][1:]
+    'error unknown file format'
+    def __init__(self, filename):
+        #TODO: check error reporting that 2 parameters required, but only 1 passed
+        super(ApoFileUnknown, self).__init__(filename)
+        self.filename = filename
+        self.fileext = os.path.splitext(filename)[1][1:]
 
-	def __str__(self):
-		err_msg = 'file %s cannot be handled, because its extension (%s) is not supported' % \
-			(self.filename, self.fileext)
-		logger_file.error = err_msg
-		logger_output.error = err_msg
-		return err_msg
+    def __str__(self):
+        err_msg = 'file %s cannot be handled, because its extension (%s) is not supported' % \
+            (self.filename, self.fileext)
+        logger_file.error = err_msg
+        logger_output.error = err_msg
+        return err_msg
 
 class FilesHandler:
-	'handles the specified multimedia files'
-	ignore_exts = ('.db', '.strm')
+    'handles the specified multimedia files'
+    ignore_exts = ('.db', '.strm')
 
-	def __init__(self, lock, database_path = ""):
-		'initializes the object'
-		self._lock = lock
-		if database_path == '':
-			logger_file.debug('no DB specified in the command line')
-		else:
-			logger_file.debug('instanciating the DB backend for %s' % database_path)
-		self._db = db_backend.DbConnector(lock, database_path)
-		logger_file.debug('DB backend instanciated')
+    def __init__(self, lock, database_path = ""):
+        'initializes the object'
+        self._lock = lock
+        if database_path == '':
+            logger_file.debug('no DB specified in the command line')
+        else:
+            logger_file.debug('instanciating the DB backend for %s' % database_path)
+        self._db = db_backend.DbConnector(lock, database_path)
+        logger_file.debug('DB backend instanciated')
 
-	def __del__(self):
-		'close the database object'
-		self._db = None
+    def __del__(self):
+        'close the database object'
+        self._db = None
 
-	def _file_checksum(self, path):
-		'calculates the SHA1 checksum of the file'
-		logger_file.debug('calculating the checksum of the file %s' % path)
-		cmd = '%s bs=1K count=%d if="%s" 2> /dev/null | %s -b' % (DD_TOOL, READ_FILE_KBS, path, CHECKSUM_TOOL)
-		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
-		lines = output.read().splitlines()
-		logger_file.debug('checksum of file calculated')
-		return lines[0].split(' ')[0]
+    def _file_checksum(self, path):
+        'calculates the SHA1 checksum of the file'
+        logger_file.debug('calculating the checksum of the file %s' % path)
+        cmd = '%s bs=1K count=%d if="%s" 2> /dev/null | %s -b' % (DD_TOOL, READ_FILE_KBS, path, CHECKSUM_TOOL)
+        output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+        lines = output.read().splitlines()
+        logger_file.debug('checksum of file calculated')
+        return lines[0].split(' ')[0]
 
-	def _file_info(self, path):
-		'gets the information of the file that will be saved in the DB'
-		# calculate the checksum
-		checksum = self._file_checksum(path)
-		# get the timestamp of the last modification
-		time = os.path.getmtime(path)
-		# get the size
-		size = os.path.getsize(path)
-		# return the values
-		return (checksum, time, size)
+    def _file_info(self, path):
+        'gets the information of the file that will be saved in the DB'
+        # calculate the checksum
+        checksum = self._file_checksum(path)
+        # get the timestamp of the last modification
+        time = os.path.getmtime(path)
+        # get the size
+        size = os.path.getsize(path)
+        # return the values
+        return (checksum, time, size)
 
-	def _image_checksum(self, path):
-		'calculates the SHA512 checksum of the contained image'
-		logger_file.debug('calculating the checksum of the image contained in file %s' % path)
-		try:
-			img = Image.open(path)
-			cksm = hashlib.sha512()
-			img.thumbnail(READ_IMAGE_SIZE)
-			cksm.update(img.tostring())
-			logger_file.debug('checksum of image calculated')
-			return cksm.hexdigest()
-		except Exception, err:
-			logger_file.error('Error getting image from file %s: %s' % (path, str(err)))
-			logger_output.error('Error getting image from file %s: %s' % (path, str(err)))
+    def _image_checksum(self, path):
+        'calculates the SHA512 checksum of the contained image'
+        logger_file.debug('calculating the checksum of the image contained in file %s' % path)
+        try:
+            img = Image.open(path)
+            cksm = hashlib.sha512()
+            img.thumbnail(READ_IMAGE_SIZE)
+            cksm.update(img.tostring())
+            logger_file.debug('checksum of image calculated')
+            return cksm.hexdigest()
+        except Exception, err:
+            logger_file.error('Error getting image from file %s: %s' % (path, str(err)))
+            logger_output.error('Error getting image from file %s: %s' % (path, str(err)))
 
-	def _video_checksum(self, path):
-		'calculates the checksum of a video, using ffmpeg and sha512sum'
-		logger_file.debug('calculating the checksum of the video contained in file %s' % path)
-		cmd = '%s bs=1K skip=%d count=%d if="%s" 2> /dev/null | %s -i pipe:0 -f avi - 2> /dev/null | %s -b' % \
-			(DD_TOOL, SKIP_VIDEO_KBS, READ_VIDEO_KBS, path, VIDEO_DECODER, CHECKSUM_TOOL)
-		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
-		result = output.read().splitlines()[0]
-		logger_file.debug('checksum of video calculated')
-		return result.split(' ')[0]
+    def _video_checksum(self, path):
+        'calculates the checksum of a video, using ffmpeg and sha512sum'
+        logger_file.debug('calculating the checksum of the video contained in file %s' % path)
+        cmd = '%s bs=1K skip=%d count=%d if="%s" 2> /dev/null | %s -i pipe:0 -f avi - 2> /dev/null | %s -b' % \
+            (DD_TOOL, SKIP_VIDEO_KBS, READ_VIDEO_KBS, path, VIDEO_DECODER, CHECKSUM_TOOL)
+        output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+        result = output.read().splitlines()[0]
+        logger_file.debug('checksum of video calculated')
+        return result.split(' ')[0]
 
-	def _wav_checksum(self, path):
-		'calculates the checksum of a wave file'
-		logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
-		try:
-			wav = wave.open(path, 'rb')
-			cksm = hashlib.sha512()
-			cksm.update(wav.readframes(READ_WAV_FRAMES))
-			logger_file.debug('checksum of audio calculated')
-			return cksm.hexdigest()
-		except Exception, err:
-			logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
-			logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+    def _wav_checksum(self, path):
+        'calculates the checksum of a wave file'
+        logger_file.debug('calculating the checksum of the audio contained in file %s' % path)
+        try:
+            wav = wave.open(path, 'rb')
+            cksm = hashlib.sha512()
+            cksm.update(wav.readframes(READ_WAV_FRAMES))
+            logger_file.debug('checksum of audio calculated')
+            return cksm.hexdigest()
+        except Exception, err:
+            logger_file.error('Error getting audio from wave file %s: %s' % (path, str(err)))
+            logger_output.error('Error getting audio from wave file %s: %s' % (path, str(err)))
 
-	def _add_jpeg(self, item_name, path):
-		'adds a JPEG file to the DB'
-		logger_file.debug('adding the JPEG file %s to the item %s' % (path, item_name))
-		# get the tags of the file
-		exif_tags = {}
-		cmd = EXIFTOOL_REQUEST + ' "' + path + '"'
-		output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
-		lines = output.read().splitlines()
-		for line in lines:
-			(tag_name, _, tag_value) = line.partition(':')
-			exif_tags[unicode(tag_name.strip(), 'iso-8859-15')] = unicode(tag_value.strip(), 'iso-8859-15')
-		# calculate the checksum of the image
-		content_checksum = self._image_checksum(path)
-		# get the required file information
-		(file_checksum, file_time, file_size) = self._file_info(path)
-		# add the file to the DB and to the item
-		self._db.add_rich_file(path, file_time, file_size, file_checksum, content_checksum, exif_tags)
-		self._db.add_item_tags(item_name, path)
-		logger_file.debug('JPEG file added to item')
+    def _add_jpeg(self, item_name, path):
+        'adds a JPEG file to the DB'
+        logger_file.debug('adding the JPEG file %s to the item %s' % (path, item_name))
+        # get the tags of the file
+        exif_tags = {}
+        cmd = EXIFTOOL_REQUEST + ' "' + path + '"'
+        output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout
+        lines = output.read().splitlines()
+        for line in lines:
+            (tag_name, _, tag_value) = line.partition(':')
+            exif_tags[unicode(tag_name.strip(), 'iso-8859-15')] = unicode(tag_value.strip(), 'iso-8859-15')
+        # calculate the checksum of the image
+        content_checksum = self._image_checksum(path)
+        # get the required file information
+        (file_checksum, file_time, file_size) = self._file_info(path)
+        # add the file to the DB and to the item
+        self._db.add_rich_file(path, file_time, file_size, file_checksum, content_checksum, exif_tags)
+        self._db.add_item_tags(item_name, path)
+        logger_file.debug('JPEG file added to item')
 
-	def _add_poor_file(self, item_type, item_name, path, cntt_cksm_fnt):
-		'adds a poor file to the DB'
-		logger_file.debug('adding the %s file %s to the item %s' % (item_type, path, item_name))
-		# get the required file information
-		(file_checksum, file_time, file_size) = self._file_info(path)
-		# calculate the checksum of the file content, if possible
-		if cntt_cksm_fnt == None:
-			content_checksum = file_checksum
-		else:
-			content_checksum = cntt_cksm_fnt(path)
-		# add the file to the DB
-		self._db.add_poor_file(path, file_time, file_size, file_checksum, content_checksum)
-		self._db.add_item_content(item_name, path)
-		logger_file.debug('file added to item: %s' % item_type)
+    def _add_poor_file(self, item_type, item_name, path, cntt_cksm_fnt):
+        'adds a poor file to the DB'
+        logger_file.debug('adding the %s file %s to the item %s' % (item_type, path, item_name))
+        # get the required file information
+        (file_checksum, file_time, file_size) = self._file_info(path)
+        # calculate the checksum of the file content, if possible
+        if cntt_cksm_fnt == None:
+            content_checksum = file_checksum
+        else:
+            content_checksum = cntt_cksm_fnt(path)
+        # add the file to the DB
+        self._db.add_poor_file(path, file_time, file_size, file_checksum, content_checksum)
+        self._db.add_item_content(item_name, path)
+        logger_file.debug('file added to item: %s' % item_type)
 
-	def is_older(self, path):
-		pass
+    def is_older(self, path):
+        pass
 
-	def add_file(self, path, force=False):
-		'adds the file of the given path to the DB'
-		logger_file.debug('adding the file %s' % path)
-		# test that path is file
-		if not os.path.isfile(path):
-			raise RuntimeError, "path isn't a file!"
-		# get file extension to find out type of file
-		(item_name, extension) = os.path.splitext(path)
-		extension = extension.lower()
-		# create a new item for the file (it does nothing if it already exists)
-		self._db.add_item(item_name, force=False)
-		# add the file to the corresponding item, if it wasn't yet
-		if (force == False) and (self._db.file_exists(path)):
-			logger_file.warning('file already exists, not adding it: %s' % path)
-			return False
-		else:
-			if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
-				self._add_jpeg(item_name, path)
-			elif (extension in ('.avi', '.mov', '.wmv')):
-				self._add_poor_file('video', item_name, path, self._video_checksum)
-			elif (extension in ('.raw', '.rw2')):
-				self._add_poor_file('RAW', item_name, path, None)
-			elif (extension in ('.tif')):
-				self._add_poor_file('TIFF', item_name, path, self._image_checksum)
-			elif (extension in ('.wav')):
-				self._add_poor_file('audio', item_name, path, self._wav_checksum)
-			elif (extension in self.ignore_exts):
-				logger_file.debug('Ignore file')
-			else:
-				#TODO: check error reporting that 2 parameters required, but only 1 passed
-				raise ApoFileUnknown(path)
-			logger_file.debug('file added')
-			return True
+    def add_file(self, path, force=False):
+        'adds the file of the given path to the DB'
+        logger_file.debug('adding the file %s' % path)
+        # test that path is file
+        if not os.path.isfile(path):
+            raise RuntimeError, "path isn't a file!"
+        # get file extension to find out type of file
+        (item_name, extension) = os.path.splitext(path)
+        extension = extension.lower()
+        # create a new item for the file (it does nothing if it already exists)
+        self._db.add_item(item_name, force=False)
+        # add the file to the corresponding item, if it wasn't yet
+        if (force == False) and (self._db.file_exists(path)):
+            logger_file.warning('file already exists, not adding it: %s' % path)
+            return False
+        else:
+            if (extension in ('.jpg', '.jpeg', '.thm', '.jpe', '.jpg_original')):
+                self._add_jpeg(item_name, path)
+            elif (extension in ('.avi', '.mov', '.wmv')):
+                self._add_poor_file('video', item_name, path, self._video_checksum)
+            elif (extension in ('.raw', '.rw2')):
+                self._add_poor_file('RAW', item_name, path, None)
+            elif (extension in ('.tif')):
+                self._add_poor_file('TIFF', item_name, path, self._image_checksum)
+            elif (extension in ('.wav')):
+                self._add_poor_file('audio', item_name, path, self._wav_checksum)
+            elif (extension in self.ignore_exts):
+                logger_file.debug('Ignore file')
+            else:
+                #TODO: check error reporting that 2 parameters required, but only 1 passed
+                raise ApoFileUnknown(path)
+            logger_file.debug('file added')
+            return True
