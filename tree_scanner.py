@@ -33,7 +33,7 @@ def file_processor(filepath):
 	logger_file.debug('lock acquired')
 	try:
 		fsh = files_handler.FilesHandler(lock, TreeScanner.db_path)
-	except:
+	except Exception, err:
 		(exception_type, exception_value, exception_traceback) = sys.exc_info()
 		logger_file.error('Error when creating FileHandler to process file %s: (%s) %s' % \
 			(filepath, str(exception_type), str(exception_value)))
@@ -48,7 +48,7 @@ def file_processor(filepath):
 	logger_file.debug('lock released')
 	try:
 		file_added = fsh.add_file(filepath)
-	except:
+	except Exception, err:
 		(exception_type, exception_value, exception_traceback) = sys.exc_info()
 		logger_file.error('Error when processing file %s: (%s) %s' % \
 			(filepath, str(exception_type), str(exception_value)))
